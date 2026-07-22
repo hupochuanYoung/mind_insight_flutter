@@ -1,16 +1,2 @@
-# mind_insight
-
-A new Flutter project.
-
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+<img width="379" height="587" alt="image" src="https://github.com/user-attachments/assets/d14aa242-da19-43df-8d9c-07d01608f541" />
+<img width="389" height="697" alt="Screenshot 2026-07-22 220933" src="https://github.com/user-attachments/assets/2b5ee20a-be86-49ff-9a6f-26714971c283" />
