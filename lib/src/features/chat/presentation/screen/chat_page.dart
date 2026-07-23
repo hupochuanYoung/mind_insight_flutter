@@ -262,7 +262,7 @@ class _ChatPageState extends State<ChatPage> {
 // GenUI Component: Card Spread (牌阵选择)
 // =============================================================================
 
-class _CardSpreadWidget extends StatelessWidget {
+class _CardSpreadWidget extends StatefulWidget {
   const _CardSpreadWidget({
     required this.metadata,
     required this.onPositionTap,
@@ -272,8 +272,29 @@ class _CardSpreadWidget extends StatelessWidget {
   final void Function(int index, String label) onPositionTap;
 
   @override
+  State<_CardSpreadWidget> createState() => _CardSpreadWidgetState();
+}
+
+class _CardSpreadWidgetState extends State<_CardSpreadWidget> {
+  /// Tracks which positions have been flipped (tapped).
+  final Set<int> _flippedPositions = {};
+
+  void _onCardTap(int index, String label) {
+    if (_flippedPositions.contains(index)) return;
+
+    setState(() {
+      _flippedPositions.add(index);
+    });
+
+    // Wait for the flip animation to finish, then notify parent
+    Future.delayed(const Duration(milliseconds: 600), () {
+      widget.onPositionTap(index, label);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final positions = (metadata['positions'] as List<dynamic>?) ?? [];
+    final positions = (widget.metadata['positions'] as List<dynamic>?) ?? [];
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
@@ -316,52 +337,92 @@ class _CardSpreadWidget extends StatelessWidget {
             runSpacing: 12,
             children: [
               for (final pos in positions)
-                _buildCardBack(context, pos as Map<String, dynamic>),
+                _FlippableCard(
+                  posData: pos as Map<String, dynamic>,
+                  isFlipped: _flippedPositions.contains(pos['index'] as int),
+                  onTap: _onCardTap,
+                ),
             ],
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildCardBack(BuildContext context, Map<String, dynamic> pos) {
-    final index = pos['index'] as int;
-    final label = pos['label'] as String? ?? '';
-    final state = pos['state'] as String? ?? 'hidden';
+/// A single card in the spread that plays a 3D flip animation when tapped.
+class _FlippableCard extends StatefulWidget {
+  const _FlippableCard({
+    required this.posData,
+    required this.isFlipped,
+    required this.onTap,
+  });
+
+  final Map<String, dynamic> posData;
+  final bool isFlipped;
+  final void Function(int index, String label) onTap;
+
+  @override
+  State<_FlippableCard> createState() => _FlippableCardState();
+}
+
+class _FlippableCardState extends State<_FlippableCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    _animation = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+  }
+
+  @override
+  void didUpdateWidget(covariant _FlippableCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isFlipped && !oldWidget.isFlipped) {
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final index = widget.posData['index'] as int;
+    final label = widget.posData['label'] as String? ?? '';
 
     return GestureDetector(
-      onTap: state == 'hidden' ? () => onPositionTap(index, label) : null,
+      onTap: widget.isFlipped ? null : () => widget.onTap(index, label),
       child: Column(
         children: [
-          Container(
-            width: 72,
-            height: 120,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.6),
-                width: 2,
-              ),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF2D1B69), Color(0xFF4A2C8A)],
-              ),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x30000000),
-                  blurRadius: 8,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
-            child: const Center(
-              child: Icon(
-                Icons.auto_awesome,
-                color: Color(0xFFFFF3C9),
-                size: 28,
-              ),
-            ),
+          AnimatedBuilder(
+            animation: _animation,
+            builder: (context, child) {
+              // value 0→1: first half (0→0.5) = card back rotating away,
+              // second half (0.5→1) = card front rotating in.
+              final angle = _animation.value * 3.14159;
+              final isBack = _animation.value < 0.5;
+
+              return Transform(
+                alignment: Alignment.center,
+                transform: Matrix4.identity()
+                  ..setEntry(3, 2, 0.001) // perspective
+                  ..rotateY(angle),
+                child: isBack ? _buildBack() : _buildFront(),
+              );
+            },
           ),
           const SizedBox(height: 6),
           Text(
@@ -372,6 +433,71 @@ class _CardSpreadWidget extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBack() {
+    return Container(
+      width: 72,
+      height: 120,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppColors.primary.withValues(alpha: 0.6),
+          width: 2,
+        ),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF2D1B69), Color(0xFF4A2C8A)],
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x30000000),
+            blurRadius: 8,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: const Center(
+        child: Icon(Icons.auto_awesome, color: Color(0xFFFFF3C9), size: 28),
+      ),
+    );
+  }
+
+  Widget _buildFront() {
+    // The front side is shown mirrored (rotated 180° on Y axis) so we
+    // counter-rotate it to display correctly.
+    return Transform(
+      alignment: Alignment.center,
+      transform: Matrix4.identity()..rotateY(3.14159),
+      child: Container(
+        width: 72,
+        height: 120,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFFFF3C9), width: 2),
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFFF8EF), Color(0xFFFFE8C8)],
+          ),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x30000000),
+              blurRadius: 8,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: const Center(
+          child: Icon(
+            Icons.auto_awesome_rounded,
+            color: AppColors.primary,
+            size: 28,
+          ),
+        ),
       ),
     );
   }
