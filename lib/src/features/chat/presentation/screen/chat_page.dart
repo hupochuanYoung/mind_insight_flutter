@@ -1,17 +1,23 @@
-import 'package:dio/dio.dart';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_core/flutter_chat_core.dart';
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
+import 'package:mind_insight/di_container.dart';
 import 'package:mind_insight/src/core/component/components.dart';
-import 'package:mind_insight/src/core/constant/app_constants.dart';
-import 'package:mind_insight/src/core/data/dio/dio_client.dart';
-import 'package:mind_insight/src/core/data/dio/logging_interceptor.dart';
+import 'package:mind_insight/src/core/constant/app_color_resources.dart';
+import 'package:mind_insight/src/core/constant/app_text_styles.dart';
+import 'package:mind_insight/src/features/chat/business/param/create_tarot_draw_param.dart';
+import 'package:mind_insight/src/features/chat/presentation/provider/chat_provider.dart';
+import 'package:mind_insight/src/features/chat/presentation/widget/genui/genui_registry.dart';
 
+/// Chat page that uses [ChatProvider] for all API interactions and renders
+/// dynamic GenUI widgets based on the agent's structured JSON responses.
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key, this.entryType});
 
-  /// The entry type from the home page (e.g. 'daily_fortune', 'worry', etc.).
-  /// When null, shows the generic chat experience.
+  /// Entry type from the home page (e.g. 'daily_fortune', 'worry', etc.).
+  /// Maps to the agent's `entry` context parameter.
   final String? entryType;
 
   @override
@@ -23,20 +29,27 @@ class _ChatPageState extends State<ChatPage> {
   static const String _assistantUserId = 'mind-insight';
 
   late final InMemoryChatController _chatController;
-  late final DioClient _dioClient;
+  late final ChatProvider _chatProvider;
 
   int _messageSequence = 0;
-  String? _sessionId;
   bool _isLoading = false;
+
+  /// The last structured agent data — available for future follow-up actions.
+  // ignore: unused_field
+  Map<String, dynamic>? _lastAgentData;
 
   @override
   void initState() {
     super.initState();
+    _chatProvider = sl<ChatProvider>();
     _chatController = InMemoryChatController(messages: _initialMessages());
-    _dioClient = DioClient(
-      AppConstants.envConfig.baseUrl,
-      loggingInterceptor: LoggingInterceptor(),
-    );
+
+    // If entry type is provided, auto-send the initial message to the agent
+    if (widget.entryType != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _sendInitialMessage();
+      });
+    }
   }
 
   @override
@@ -47,30 +60,62 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Column(
-        children: [
-          const _ChatHeader(),
-          _PromptStrip(onPromptTap: _handlePromptTap),
-          Expanded(
-            child: Chat(
-              currentUserId: _currentUserId,
-              resolveUser: _resolveUser,
-              chatController: _chatController,
-              onMessageSend: _handleMessageSend,
-              backgroundColor: AppColors.surface,
-              theme: _chatTheme(context),
-              builders: Builders(customMessageBuilder: _buildCustomMessage),
-            ),
-          ),
-        ],
+    return Scaffold(
+      backgroundColor: ColorResources.surface,
+      appBar: _buildAppBar(),
+      body: SafeArea(
+        child: Chat(
+          currentUserId: _currentUserId,
+          resolveUser: _resolveUser,
+          chatController: _chatController,
+          onMessageSend: _handleMessageSend,
+          backgroundColor: ColorResources.surface,
+          theme: _chatTheme(context),
+          builders: Builders(customMessageBuilder: _buildCustomMessage),
+        ),
       ),
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Initial messages
-  // ---------------------------------------------------------------------------
+  // ===========================================================================
+  // App bar
+  // ===========================================================================
+
+  PreferredSizeWidget _buildAppBar() {
+    final title = _entryTitle(widget.entryType);
+    return AppBar(
+      backgroundColor: ColorResources.surface,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      centerTitle: true,
+      title: Text(
+        title,
+        style: textBoldLarge.copyWith(color: ColorResources.ink),
+      ),
+      leading: Navigator.canPop(context)
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+              onPressed: () => Navigator.of(context).pop(),
+            )
+          : null,
+    );
+  }
+
+  String _entryTitle(String? type) {
+    return switch (type) {
+      'daily_fortune' => '今日运势',
+      'worry' => '最近烦恼',
+      'relationship' => '关系问题',
+      'career' => '事业学业',
+      'choice' => '选择困难',
+      'just_talk' => '只想聊聊',
+      _ => '塔罗对话',
+    };
+  }
+
+  // ===========================================================================
+  // Initial messages & auto-send
+  // ===========================================================================
 
   List<Message> _initialMessages() {
     final now = DateTime.now();
@@ -93,25 +138,45 @@ class _ChatPageState extends State<ChatPage> {
       'career' => '最近是工作、学习，还是方向选择让你压力比较大？',
       'choice' => '你现在纠结的两个选择分别是什么？说出来我们一起看看。',
       'just_talk' => '今天不一定要抽牌，我们可以只是聊聊。你想说点什么？',
-      _ => '你好，我是你的塔罗向导。告诉我你想探索的问题，或者点击上方的提示开始。',
+      _ => '你好，我是你的塔罗向导。告诉我你想探索的问题吧。',
     };
   }
 
-  // ---------------------------------------------------------------------------
-  // User actions
-  // ---------------------------------------------------------------------------
+  /// For `daily_fortune`, auto-send the initial message to skip user input.
+  Future<void> _sendInitialMessage() async {
+    final initialMessage = _autoMessageForEntry(widget.entryType);
+    if (initialMessage == null) return;
 
-  void _handlePromptTap(String prompt) {
-    _handleMessageSend(prompt);
+    // Insert as user bubble
+    _chatController.insertMessage(
+      Message.text(
+        id: _nextMessageId(),
+        authorId: _currentUserId,
+        createdAt: DateTime.now(),
+        sentAt: DateTime.now(),
+        text: initialMessage,
+      ),
+    );
+    await _sendToAgent(initialMessage);
   }
+
+  /// Only some entries auto-send an initial message.
+  String? _autoMessageForEntry(String? type) {
+    return switch (type) {
+      'daily_fortune' => '我想看看今日运势',
+      _ => null,
+    };
+  }
+
+  // ===========================================================================
+  // User actions
+  // ===========================================================================
 
   void _handleMessageSend(String text) {
     final trimmedText = text.trim();
     if (trimmedText.isEmpty || _isLoading) return;
 
     final now = DateTime.now();
-
-    // Insert user message
     _chatController.insertMessage(
       Message.text(
         id: _nextMessageId(),
@@ -122,94 +187,245 @@ class _ChatPageState extends State<ChatPage> {
       ),
     );
 
-    // Call agent API
     _sendToAgent(trimmedText);
   }
 
-  // ---------------------------------------------------------------------------
-  // Agent API call
-  // ---------------------------------------------------------------------------
+  // ===========================================================================
+  // Agent API call — uses ChatProvider
+  // ===========================================================================
 
   Future<void> _sendToAgent(String message) async {
     setState(() => _isLoading = true);
 
-    try {
-      final response = await _dioClient.post(
-        AppConstants.agentChatUri,
-        data: {
-          'message': message,
-          'user_id': _currentUserId,
-          if (_sessionId != null) 'session_id': _sessionId,
-        },
-      );
+    await _chatProvider.sendMessage(message: message, agentType: 'tarot');
 
-      final data = response.data as Map<String, dynamic>;
-      _sessionId = data['session_id'] as String?;
-      final replies = data['replies'] as List<dynamic>? ?? [];
+    if (!mounted) return;
 
-      final now = DateTime.now();
+    if (_chatProvider.errorMessage != null) {
+      _insertAssistantText('⚠️ ${_chatProvider.errorMessage}');
+    } else if (_chatProvider.lastAgentResponse != null) {
+      _processAgentResponse(_chatProvider.lastAgentResponse!);
+    }
 
-      for (final reply in replies) {
-        final replyMap = reply as Map<String, dynamic>;
-        final type = replyMap['type'] as String;
-        final content = replyMap['content'];
+    setState(() => _isLoading = false);
+  }
 
-        switch (type) {
-          case 'text':
-            _chatController.insertMessage(
-              Message.text(
-                id: _nextMessageId(),
-                authorId: _assistantUserId,
-                createdAt: now,
-                text: content as String,
-              ),
-            );
-          case 'genui':
-            _chatController.insertMessage(
-              Message.custom(
-                id: _nextMessageId(),
-                authorId: _assistantUserId,
-                createdAt: now,
-                metadata: content as Map<String, dynamic>,
-              ),
-            );
-          case 'error':
-            _chatController.insertMessage(
-              Message.text(
-                id: _nextMessageId(),
-                authorId: _assistantUserId,
-                createdAt: now,
-                text: '⚠️ $content',
-              ),
-            );
+  /// Parse the `AgentChatModel.messages` list from the backend.
+  ///
+  /// Structure: Messages[].Contents[].Text (which is a JSON-encoded Map
+  /// or already a Map depending on backend serialization).
+  void _processAgentResponse(dynamic agentResponse) {
+    final messages = agentResponse.messages as List<dynamic>? ?? [];
+
+    for (final msg in messages) {
+      final msgMap = msg as Map<String, dynamic>;
+      final contents = msgMap['Contents'] as List<dynamic>? ?? [];
+
+      for (final content in contents) {
+        final contentMap = content as Map<String, dynamic>;
+        final contentType = contentMap['Type'] as String? ?? '';
+
+        if (contentType == 'text') {
+          final textField = contentMap['Text'];
+          Map<String, dynamic>? parsedData;
+
+          // Text can be a Map (already parsed) or a JSON string
+          if (textField is Map<String, dynamic>) {
+            parsedData = textField;
+          } else if (textField is String) {
+            try {
+              parsedData = jsonDecode(textField) as Map<String, dynamic>;
+            } catch (_) {
+              // Plain text, not structured JSON
+              _insertAssistantText(textField);
+              continue;
+            }
+          }
+
+          if (parsedData != null && parsedData['type'] == 'tarot_ui') {
+            _lastAgentData = parsedData;
+            _insertGenUiMessage(parsedData);
+          } else if (parsedData != null) {
+            // Unknown structured type — show message field if present
+            final msg = parsedData['message'] as String?;
+            if (msg != null && msg.isNotEmpty) {
+              _insertAssistantText(msg);
+            }
+          }
         }
       }
-    } on DioException catch (e) {
-      _chatController.insertMessage(
-        Message.text(
-          id: _nextMessageId(),
-          authorId: _assistantUserId,
-          createdAt: DateTime.now(),
-          text: '⚠️ 无法连接到服务：${e.message}',
-        ),
-      );
-    } catch (e) {
-      _chatController.insertMessage(
-        Message.text(
-          id: _nextMessageId(),
-          authorId: _assistantUserId,
-          createdAt: DateTime.now(),
-          text: '⚠️ 发生错误：$e',
-        ),
-      );
-    } finally {
-      setState(() => _isLoading = false);
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Custom message builder — renders GenUI components
-  // ---------------------------------------------------------------------------
+  // ===========================================================================
+  // GenUI action handler — orchestrates the tarot flow
+  // ===========================================================================
+
+  void _handleGenUiAction(String action, Map<String, dynamic> data) {
+    switch (action) {
+      case 'start_draw':
+        _handleStartDraw(data);
+      case 'reveal_cards':
+        _handleRevealCards(data);
+      case 'continue_chat':
+        // No-op — just let user keep typing
+        break;
+      case 'end_draw':
+        _handleEndDraw();
+      default:
+        break;
+    }
+  }
+
+  /// Create a tarot draw session, then show the card shuffle widget.
+  Future<void> _handleStartDraw(Map<String, dynamic> data) async {
+    setState(() => _isLoading = true);
+
+    final innerData = data['data'] as Map<String, dynamic>? ?? {};
+    final spread =
+        innerData['recommended_spread'] as Map<String, dynamic>? ?? {};
+
+    // Build draw param from the agent response data
+    final param = CreateTarotDrawParam(
+      conversationId: _chatProvider.currentConversationId ?? 0,
+      question: innerData['question_summary'] as String? ?? '',
+      questionSummary: innerData['question_summary'] as String?,
+      topic: innerData['topic'] as String?,
+      spreadType: spread['id'] as String? ?? 'single_card',
+      spreadName: spread['name'] as String?,
+      requiredCards: spread['required_cards'] as int? ?? 1,
+      guidance: data['message'] as String?,
+      positions:
+          (spread['positions'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          ['此刻最需要看见的部分'],
+      allowReversed: true,
+      // Agent metadata from the chat response
+      agentRecordId: _chatProvider.lastAgentResponse?.recordId,
+      agentConversationId: _chatProvider.lastAgentResponse?.conversationId,
+      agentRelatedRecordId: _chatProvider.lastAgentResponse?.relatedRecordId,
+      agentMessageId: _chatProvider.lastAgentResponse?.messageId,
+      agentStage: data['stage'] as String?,
+      agentUiView: data['ui_view'] as String?,
+      agentLanguage: data['language'] as String?,
+      agentActions: data['actions'] as List<dynamic>?,
+      agentText: data,
+    );
+
+    await _chatProvider.createTarotDraw(param);
+
+    if (!mounted) return;
+
+    if (_chatProvider.errorMessage != null) {
+      _insertAssistantText('⚠️ ${_chatProvider.errorMessage}');
+    } else if (_chatProvider.currentTarotSession != null) {
+      final session = _chatProvider.currentTarotSession!;
+      // Insert the card shuffle widget
+      _insertGenUiMessage({
+        'ui_view': 'card_shuffle',
+        'message': '请选择你的牌',
+        'requiredCards': session.requiredCards,
+        'spreadName': session.spreadName ?? param.spreadName,
+        'positions': param.positions,
+        'tarotSessionId': session.id,
+      });
+    }
+
+    setState(() => _isLoading = false);
+  }
+
+  /// Reveal the selected cards.
+  /// Reveal the selected cards — backend returns cards + interpretation directly.
+  Future<void> _handleRevealCards(Map<String, dynamic> data) async {
+    setState(() => _isLoading = true);
+
+    final sessionId =
+        data['tarotSessionId'] as int? ??
+        _chatProvider.currentTarotSession?.id ??
+        0;
+    final selectedIndexes =
+        (data['selectedIndexes'] as List<dynamic>?)
+            ?.map((e) => e as int)
+            .toList() ??
+        [];
+
+    await _chatProvider.revealCards(
+      tarotSessionId: sessionId,
+      selectedIndexes: selectedIndexes,
+    );
+
+    if (!mounted) return;
+
+    if (_chatProvider.errorMessage != null) {
+      _insertAssistantText('⚠️ ${_chatProvider.errorMessage}');
+    } else if (_chatProvider.lastReveal != null) {
+      final reveal = _chatProvider.lastReveal!;
+
+      // Reveal API returns cards + interpretation in one shot
+      if (reveal.hasStructuredInterpretation) {
+        final interpMap = reveal.interpretationMap!;
+        _lastAgentData = interpMap;
+        _insertGenUiMessage(interpMap);
+      } else {
+        // Fallback: show cards without full interpretation
+        _insertGenUiMessage({
+          'ui_view': 'card_reveal',
+          'message': '牌已翻开',
+          'data': {
+            'cards': reveal.cards
+                .map(
+                  (c) => {
+                    'name': c.card,
+                    'orientation': c.orientation,
+                    'position': c.slot,
+                  },
+                )
+                .toList(),
+          },
+          'actions': ['continue_chat', 'end_draw'],
+        });
+      }
+    }
+
+    setState(() => _isLoading = false);
+  }
+
+  /// End the current draw — reset conversation state for a fresh start.
+  void _handleEndDraw() {
+    _chatProvider.resetConversation();
+    _insertAssistantText('本次塔罗体验到此结束。如果你还想聊聊或再抽一次牌，随时告诉我。');
+  }
+
+  // ===========================================================================
+  // Message insertion helpers
+  // ===========================================================================
+
+  void _insertAssistantText(String text) {
+    _chatController.insertMessage(
+      Message.text(
+        id: _nextMessageId(),
+        authorId: _assistantUserId,
+        createdAt: DateTime.now(),
+        text: text,
+      ),
+    );
+  }
+
+  void _insertGenUiMessage(Map<String, dynamic> data) {
+    _chatController.insertMessage(
+      Message.custom(
+        id: _nextMessageId(),
+        authorId: _assistantUserId,
+        createdAt: DateTime.now(),
+        metadata: data,
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // Custom message builder — delegates to GenUI registry
+  // ===========================================================================
 
   Widget _buildCustomMessage(
     BuildContext context,
@@ -219,26 +435,12 @@ class _ChatPageState extends State<ChatPage> {
     MessageGroupStatus? groupStatus,
   }) {
     final metadata = message.metadata ?? {};
-    final component = metadata['component'] as String? ?? '';
-
-    return switch (component) {
-      'card_spread' => _CardSpreadWidget(
-        metadata: metadata,
-        onPositionTap: _handleCardPositionTap,
-      ),
-      'card_reveal' => _CardRevealWidget(metadata: metadata),
-      _ => const SizedBox.shrink(),
-    };
+    return GenUiRegistry.build(data: metadata, onAction: _handleGenUiAction);
   }
 
-  void _handleCardPositionTap(int positionIndex, String label) {
-    // Send a message to the agent to reveal this card
-    _handleMessageSend('翻开第${positionIndex + 1}张牌（$label）');
-  }
-
-  // ---------------------------------------------------------------------------
+  // ===========================================================================
   // Helpers
-  // ---------------------------------------------------------------------------
+  // ===========================================================================
 
   Future<User?> _resolveUser(String id) async {
     return switch (id) {
@@ -258,7 +460,6 @@ class _ChatPageState extends State<ChatPage> {
 
   ChatTheme _chatTheme(BuildContext context) {
     final baseTypography = ChatTypography.fromThemeData(Theme.of(context));
-
     return ChatTheme(
       colors: const ChatColors(
         primary: AppColors.primary,
@@ -273,465 +474,4 @@ class _ChatPageState extends State<ChatPage> {
       shape: const BorderRadius.all(Radius.circular(8)),
     );
   }
-}
-
-// =============================================================================
-// GenUI Component: Card Spread (牌阵选择)
-// =============================================================================
-
-class _CardSpreadWidget extends StatefulWidget {
-  const _CardSpreadWidget({
-    required this.metadata,
-    required this.onPositionTap,
-  });
-
-  final Map<String, dynamic> metadata;
-  final void Function(int index, String label) onPositionTap;
-
-  @override
-  State<_CardSpreadWidget> createState() => _CardSpreadWidgetState();
-}
-
-class _CardSpreadWidgetState extends State<_CardSpreadWidget> {
-  /// Tracks which positions have been flipped (tapped).
-  final Set<int> _flippedPositions = {};
-
-  void _onCardTap(int index, String label) {
-    if (_flippedPositions.contains(index)) return;
-
-    setState(() {
-      _flippedPositions.add(index);
-    });
-
-    // Wait for the flip animation to finish, then notify parent
-    Future.delayed(const Duration(milliseconds: 600), () {
-      widget.onPositionTap(index, label);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final positions = (widget.metadata['positions'] as List<dynamic>?) ?? [];
-
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF8EF),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.auto_awesome_rounded,
-                size: 18,
-                color: AppColors.primary,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '牌阵准备就绪',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '点击牌位来翻开你的牌',
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              for (final pos in positions)
-                _FlippableCard(
-                  posData: pos as Map<String, dynamic>,
-                  isFlipped: _flippedPositions.contains(pos['index'] as int),
-                  onTap: _onCardTap,
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// A single card in the spread that plays a 3D flip animation when tapped.
-class _FlippableCard extends StatefulWidget {
-  const _FlippableCard({
-    required this.posData,
-    required this.isFlipped,
-    required this.onTap,
-  });
-
-  final Map<String, dynamic> posData;
-  final bool isFlipped;
-  final void Function(int index, String label) onTap;
-
-  @override
-  State<_FlippableCard> createState() => _FlippableCardState();
-}
-
-class _FlippableCardState extends State<_FlippableCard>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _animation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 600),
-      vsync: this,
-    );
-    _animation = Tween<double>(
-      begin: 0,
-      end: 1,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
-  }
-
-  @override
-  void didUpdateWidget(covariant _FlippableCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.isFlipped && !oldWidget.isFlipped) {
-      _controller.forward();
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final index = widget.posData['index'] as int;
-    final label = widget.posData['label'] as String? ?? '';
-
-    return GestureDetector(
-      onTap: widget.isFlipped ? null : () => widget.onTap(index, label),
-      child: Column(
-        children: [
-          AnimatedBuilder(
-            animation: _animation,
-            builder: (context, child) {
-              // value 0→1: first half (0→0.5) = card back rotating away,
-              // second half (0.5→1) = card front rotating in.
-              final angle = _animation.value * 3.14159;
-              final isBack = _animation.value < 0.5;
-
-              return Transform(
-                alignment: Alignment.center,
-                transform: Matrix4.identity()
-                  ..setEntry(3, 2, 0.001) // perspective
-                  ..rotateY(angle),
-                child: isBack ? _buildBack() : _buildFront(),
-              );
-            },
-          ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: AppColors.muted,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBack() {
-    return Container(
-      width: 72,
-      height: 120,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.6),
-          width: 2,
-        ),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF2D1B69), Color(0xFF4A2C8A)],
-        ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x30000000),
-            blurRadius: 8,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: const Center(
-        child: Icon(Icons.auto_awesome, color: Color(0xFFFFF3C9), size: 28),
-      ),
-    );
-  }
-
-  Widget _buildFront() {
-    // The front side is shown mirrored (rotated 180° on Y axis) so we
-    // counter-rotate it to display correctly.
-    return Transform(
-      alignment: Alignment.center,
-      transform: Matrix4.identity()..rotateY(3.14159),
-      child: Container(
-        width: 72,
-        height: 120,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFFFFF3C9), width: 2),
-          gradient: const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFFFFF8EF), Color(0xFFFFE8C8)],
-          ),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x30000000),
-              blurRadius: 8,
-              offset: Offset(0, 4),
-            ),
-          ],
-        ),
-        child: const Center(
-          child: Icon(
-            Icons.auto_awesome_rounded,
-            color: AppColors.primary,
-            size: 28,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// =============================================================================
-// GenUI Component: Card Reveal (翻牌结果)
-// =============================================================================
-
-class _CardRevealWidget extends StatelessWidget {
-  const _CardRevealWidget({required this.metadata});
-
-  final Map<String, dynamic> metadata;
-
-  @override
-  Widget build(BuildContext context) {
-    final card = metadata['card'] as Map<String, dynamic>? ?? {};
-    final positionLabel = metadata['position_label'] as String? ?? '';
-    final cardName = card['name'] as String? ?? '';
-    final orientation = card['orientation'] as String? ?? 'upright';
-    final imageIndex = card['image_index'] as int? ?? 1;
-
-    final isReversed = orientation == 'reversed';
-    final assetPath = TarotAssets.card(imageIndex);
-
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x15000000),
-            blurRadius: 12,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TarotCardView(
-            assetPath: assetPath,
-            width: 72,
-            height: 120,
-            angle: isReversed ? 3.14159 : 0,
-            borderColor: AppColors.primary.withValues(alpha: 0.5),
-            borderWidth: 2,
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.primarySoft,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    positionLabel,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  cardName,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  isReversed ? '逆位' : '正位',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: isReversed ? Colors.deepOrange : AppColors.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// =============================================================================
-// Chat Header
-// =============================================================================
-
-class _ChatHeader extends StatelessWidget {
-  const _ChatHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-      child: Row(
-        children: [
-          const AppIconBadge(
-            icon: Icons.auto_awesome_rounded,
-            backgroundColor: AppColors.primary,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Tarot Chat',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Ask, reflect, and shape the next reading.',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.muted,
-                    letterSpacing: 0,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// =============================================================================
-// Prompt Strip
-// =============================================================================
-
-class _PromptStrip extends StatelessWidget {
-  const _PromptStrip({required this.onPromptTap});
-
-  final void Function(String prompt) onPromptTap;
-
-  static const List<_PromptAction> _prompts = [
-    _PromptAction(
-      icon: Icons.favorite_border_rounded,
-      label: '感情',
-      message: '我想了解最近的感情状况',
-    ),
-    _PromptAction(
-      icon: Icons.work_outline_rounded,
-      label: '事业',
-      message: '我想看看事业发展方向',
-    ),
-    _PromptAction(
-      icon: Icons.bolt_rounded,
-      label: '能量',
-      message: '我想了解当前的能量状态',
-    ),
-    _PromptAction(
-      icon: Icons.visibility_outlined,
-      label: '阴影',
-      message: '帮我看看需要面对的阴影面',
-    ),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 46,
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        scrollDirection: Axis.horizontal,
-        itemCount: _prompts.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final prompt = _prompts[index];
-
-          return ActionChip(
-            avatar: Icon(prompt.icon, size: 18, color: AppColors.primary),
-            label: Text(prompt.label),
-            backgroundColor: AppColors.card,
-            side: const BorderSide(color: AppColors.border),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            labelStyle: const TextStyle(
-              color: AppColors.ink,
-              fontWeight: FontWeight.w700,
-            ),
-            onPressed: () => onPromptTap(prompt.message),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _PromptAction {
-  const _PromptAction({
-    required this.icon,
-    required this.label,
-    required this.message,
-  });
-
-  final IconData icon;
-  final String label;
-  final String message;
 }
