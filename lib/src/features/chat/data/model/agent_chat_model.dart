@@ -8,6 +8,7 @@ class AgentChatModel {
   final String messageId;
   final int localConversationId;
   final List<dynamic> messages;
+  final DateTime? timestamp;
 
   const AgentChatModel({
     required this.recordId,
@@ -16,9 +17,13 @@ class AgentChatModel {
     required this.messageId,
     required this.localConversationId,
     required this.messages,
+    this.timestamp,
   });
 
-  factory AgentChatModel.fromJson(Map<String, dynamic> json) {
+  factory AgentChatModel.fromJson(
+    Map<String, dynamic> json, {
+    dynamic timestamp,
+  }) {
     return AgentChatModel(
       recordId: json['RecordId'] as String? ?? '',
       conversationId: json['ConversationId'] as String? ?? '',
@@ -26,6 +31,14 @@ class AgentChatModel {
       messageId: json['MessageId'] as String? ?? '',
       localConversationId: json['LocalConversationId'] as int? ?? 0,
       messages: json['Messages'] as List<dynamic>? ?? [],
+      timestamp: _parseTimestamp(timestamp),
     );
+  }
+
+  static DateTime? _parseTimestamp(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
+    if (value is String) return DateTime.tryParse(value);
+    return null;
   }
 }

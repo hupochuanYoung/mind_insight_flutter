@@ -204,7 +204,8 @@ class _ChatPageState extends State<ChatPage> {
     if (_chatProvider.errorMessage != null) {
       _insertAssistantText('⚠️ ${_chatProvider.errorMessage}');
     } else if (_chatProvider.lastAgentResponse != null) {
-      _processAgentResponse(_chatProvider.lastAgentResponse!);
+      final response = _chatProvider.lastAgentResponse!;
+      _processAgentResponse(response, response.timestamp);
     }
 
     setState(() => _isLoading = false);
@@ -214,8 +215,9 @@ class _ChatPageState extends State<ChatPage> {
   ///
   /// Structure: Messages[].Contents[].Text (which is a JSON-encoded Map
   /// or already a Map depending on backend serialization).
-  void _processAgentResponse(dynamic agentResponse) {
+  void _processAgentResponse(dynamic agentResponse, DateTime? serverTime) {
     final messages = agentResponse.messages as List<dynamic>? ?? [];
+    final time = serverTime ?? DateTime.now();
 
     for (final msg in messages) {
       final msgMap = msg as Map<String, dynamic>;
@@ -233,23 +235,36 @@ class _ChatPageState extends State<ChatPage> {
           if (textField is Map<String, dynamic>) {
             parsedData = textField;
           } else if (textField is String) {
+            // Strip markdown code fences if present (```json ... ```)
+            final cleaned = _stripMarkdownCodeBlock(textField);
             try {
-              parsedData = jsonDecode(textField) as Map<String, dynamic>;
+              parsedData = jsonDecode(cleaned) as Map<String, dynamic>;
             } catch (_) {
               // Plain text, not structured JSON
-              _insertAssistantText(textField);
+              _insertAssistantText(textField, at: time);
               continue;
             }
           }
 
           if (parsedData != null && parsedData['type'] == 'tarot_ui') {
             _lastAgentData = parsedData;
-            _insertGenUiMessage(parsedData);
+            final uiView = parsedData['ui_view'] as String? ?? '';
+
+            // Plain text responses → insert as normal text message (shows time)
+            if (uiView == 'plain_message' || uiView == 'clarify_question') {
+              final msg = parsedData['message'] as String? ?? '';
+              if (msg.isNotEmpty) {
+                _insertAssistantText(msg, at: time);
+              }
+            } else {
+              // Interactive GenUI components → insert as custom message
+              _insertGenUiMessage(parsedData, at: time);
+            }
           } else if (parsedData != null) {
             // Unknown structured type — show message field if present
             final msg = parsedData['message'] as String?;
             if (msg != null && msg.isNotEmpty) {
-              _insertAssistantText(msg);
+              _insertAssistantText(msg, at: time);
             }
           }
         }
@@ -401,23 +416,23 @@ class _ChatPageState extends State<ChatPage> {
   // Message insertion helpers
   // ===========================================================================
 
-  void _insertAssistantText(String text) {
+  void _insertAssistantText(String text, {DateTime? at}) {
     _chatController.insertMessage(
       Message.text(
         id: _nextMessageId(),
         authorId: _assistantUserId,
-        createdAt: DateTime.now(),
+        createdAt: at ?? DateTime.now(),
         text: text,
       ),
     );
   }
 
-  void _insertGenUiMessage(Map<String, dynamic> data) {
+  void _insertGenUiMessage(Map<String, dynamic> data, {DateTime? at}) {
     _chatController.insertMessage(
       Message.custom(
         id: _nextMessageId(),
         authorId: _assistantUserId,
-        createdAt: DateTime.now(),
+        createdAt: at ?? DateTime.now(),
         metadata: data,
       ),
     );
@@ -441,6 +456,20 @@ class _ChatPageState extends State<ChatPage> {
   // ===========================================================================
   // Helpers
   // ===========================================================================
+
+  /// Strip markdown code block fences (```json ... ``` or ``` ... ```).
+  String _stripMarkdownCodeBlock(String text) {
+    final trimmed = text.trim();
+    if (!trimmed.startsWith('```')) return trimmed;
+    // Remove opening fence (```json or ```)
+    var start = trimmed.indexOf('\n');
+    if (start == -1) return trimmed;
+    start += 1;
+    // Remove closing fence
+    var end = trimmed.lastIndexOf('```');
+    if (end <= start) end = trimmed.length;
+    return trimmed.substring(start, end).trim();
+  }
 
   Future<User?> _resolveUser(String id) async {
     return switch (id) {

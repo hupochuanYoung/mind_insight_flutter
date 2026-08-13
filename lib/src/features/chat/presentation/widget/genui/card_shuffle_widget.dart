@@ -8,9 +8,8 @@ import 'genui_registry.dart';
 
 /// Card shuffle & selection widget — user picks N cards from a shuffled fan.
 ///
-/// Used when the tarot session is created (status: "created") and user
-/// needs to select their cards. Not driven by a specific `ui_view` from agent,
-/// but inserted by the chat page after a successful draw creation.
+/// Tap a card to select it (highlighted), then confirm/cancel appears below.
+/// Once confirmed, calls reveal and locks the widget from further interaction.
 class CardShuffleWidget extends StatefulWidget {
   const CardShuffleWidget({
     super.key,
@@ -38,7 +37,7 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
   late final AnimationController _shuffleController;
   late final Animation<double> _shuffleAnimation;
   bool _isShuffling = true;
-  bool _isSubmitted = false;
+  bool _isConfirmed = false;
 
   @override
   void initState() {
@@ -65,7 +64,7 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
   }
 
   void _onCardTap(int index) {
-    if (_isShuffling || _isSubmitted) return;
+    if (_isShuffling || _isConfirmed) return;
 
     setState(() {
       if (_selectedIndexes.contains(index)) {
@@ -74,18 +73,20 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
         _selectedIndexes.add(index);
       }
     });
-
-    // Auto-submit when all cards are selected
-    if (_selectedIndexes.length == _requiredCards) {
-      _submit();
-    }
   }
 
-  void _submit() {
-    setState(() => _isSubmitted = true);
+  void _onConfirm() {
+    if (_selectedIndexes.length != _requiredCards) return;
+    setState(() => _isConfirmed = true);
     widget.onAction('reveal_cards', {
       ...widget.data,
       'selectedIndexes': _selectedIndexes,
+    });
+  }
+
+  void _onCancel() {
+    setState(() {
+      _selectedIndexes.clear();
     });
   }
 
@@ -97,6 +98,7 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
             .toList() ??
         [];
     final remaining = _requiredCards - _selectedIndexes.length;
+    final allSelected = _selectedIndexes.length == _requiredCards;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
@@ -119,7 +121,7 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
               ),
               const SizedBox(width: 8),
               Text(
-                _isSubmitted
+                _isConfirmed
                     ? '已选定 $_requiredCards 张牌'
                     : _isShuffling
                     ? '正在洗牌...'
@@ -128,15 +130,20 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
               ),
             ],
           ),
-          if (!_isSubmitted && !_isShuffling) ...[
+          if (!_isConfirmed && !_isShuffling) ...[
             const SizedBox(height: 4),
             Text(
-              remaining > 0 ? '还需选择 $remaining 张' : '点击确认翻牌',
-              style: textSmall.copyWith(color: ColorResources.muted),
+              remaining > 0 ? '还需选择 $remaining 张' : '已选好，请确认',
+              style: textSmall.copyWith(
+                color: allSelected
+                    ? ColorResources.primary
+                    : ColorResources.muted,
+                fontWeight: allSelected ? FontWeight.w600 : FontWeight.w400,
+              ),
             ),
           ],
           // Position hints
-          if (positions.isNotEmpty && !_isSubmitted) ...[
+          if (positions.isNotEmpty && !_isConfirmed) ...[
             const SizedBox(height: 10),
             Wrap(
               spacing: 6,
@@ -183,6 +190,83 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
               );
             },
           ),
+          // Confirm / Cancel buttons (shown when selection is complete)
+          if (allSelected && !_isConfirmed) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _onCancel,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: ColorResources.muted,
+                      side: const BorderSide(color: ColorResources.border),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                          Dimensions.radiusDefault,
+                        ),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: Text(
+                      '重新选择',
+                      style: textMedium.copyWith(color: ColorResources.muted),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton(
+                    onPressed: _onConfirm,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: ColorResources.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                          Dimensions.radiusDefault,
+                        ),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.check_rounded, size: 18),
+                        const SizedBox(width: 6),
+                        Text(
+                          '确认翻牌',
+                          style: textBoldLarge.copyWith(color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          // Confirmed state indicator
+          if (_isConfirmed) ...[
+            const SizedBox(height: 12),
+            Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.check_circle_rounded,
+                    size: 16,
+                    color: ColorResources.teal,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '已确认，正在翻牌...',
+                    style: textSmall.copyWith(color: ColorResources.teal),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -190,7 +274,7 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
 
   Widget _buildCardFan() {
     // Show cards in a fan/arc layout
-    final displayCount = min(_totalCards, 12); // Show 12 cards in the fan
+    final displayCount = min(_totalCards, 12);
     final fanWidth = MediaQuery.of(context).size.width - 80;
 
     return SizedBox(

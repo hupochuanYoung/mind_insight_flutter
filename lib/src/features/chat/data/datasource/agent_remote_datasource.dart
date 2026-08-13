@@ -37,6 +37,7 @@ class AgentRemoteDatasource {
 
       final model = AgentChatModel.fromJson(
         body['data'] as Map<String, dynamic>,
+        timestamp: body['timestamp'],
       );
       return right(model);
     } on DioException catch (e) {
