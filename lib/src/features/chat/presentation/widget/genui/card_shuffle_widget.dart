@@ -122,12 +122,6 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
   void _onPanUpdate(DragUpdateDetails details) {
     if (_isShuffling || _isConfirmed) return;
     setState(() {
-      // Convert horizontal drag pixels to rotation: 300px ≈ full card spacing
-      _rotationAngle =
-          _dragStartAngle +
-          details.localPosition.dx * 0.005 -
-          details.localPosition.dx * 0.005;
-      // Actually track delta from start
       _rotationAngle += details.delta.dx * 0.008;
     });
   }
