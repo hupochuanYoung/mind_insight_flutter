@@ -103,4 +103,8 @@ class AppConstants {
 
   /// POST /api/tarot/draws/{id}/reveal
   static String tarotDrawRevealUri(int id) => '/api/tarot/draws/$id/reveal';
+
+  /// POST /api/tarot/draws/{id}/interpret
+  static String tarotDrawInterpretUri(int id) =>
+      '/api/tarot/draws/$id/interpret';
 }
