@@ -1,6 +1,5 @@
 import 'dart:math';
 
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:mind_insight/src/core/constant/app_color_resources.dart';
 import 'package:mind_insight/src/core/constant/app_dimensions.dart';
@@ -11,9 +10,8 @@ import 'genui_registry.dart';
 /// Card shuffle & selection widget — smooth 2D ellipse carousel.
 ///
 /// Cards sit on an elliptical ring. Horizontal swipe rotates the ring.
-/// Vertical swipe changes the ellipse "flatness" to simulate viewing angle
-/// (flat = top-down, tall = eye-level). No 3D transforms are used —
-/// only position, scale, and opacity for flicker-free rendering.
+/// Vertical swipe changes the ellipse "flatness" to simulate viewing angle.
+/// No 3D transforms — only position, scale, and opacity for flicker-free rendering.
 class CardShuffleWidget extends StatefulWidget {
   const CardShuffleWidget({
     super.key,
@@ -44,11 +42,10 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
   bool _isConfirmed = false;
 
   // Ring state
-  double _rotation = 0.0; // radians, horizontal
-  double _perspective =
-      0.55; // 0 = flat (top-down), 1 = tall ellipse (eye-level side view)
+  double _rotation = 0.0;
+  double _perspective = 0.55; // >0 looking down, <0 looking up
 
-  static const double _minPerspective = 0.15;
+  static const double _minPerspective = -0.85;
   static const double _maxPerspective = 0.85;
 
   // Fling
@@ -83,6 +80,13 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
   }
 
   // --- Gesture handling ---
+  // GestureDetector with onTapUp + onPan* allows tap and drag to coexist.
+  // Once pan is recognized, it claims the gesture arena and blocks parent scroll.
+
+  void _onTapUp(TapUpDetails details) {
+    if (_isShuffling || _isConfirmed) return;
+    _handleTapAt(details.localPosition);
+  }
 
   void _onPanStart(DragStartDetails details) {
     _flinging = false;
@@ -113,18 +117,56 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
 
   void _animateFling() {
     if (!_flinging || !mounted) return;
-    _flingProgress += 0.04; // ~60fps step
+    _flingProgress += 0.04;
     if (_flingProgress >= 1.0) {
       _flinging = false;
       setState(() => _rotation = _flingTarget);
       return;
     }
-    // Ease-out curve
     final t = 1.0 - pow(1.0 - _flingProgress, 3).toDouble();
     setState(() {
       _rotation = _flingStart + (_flingTarget - _flingStart) * t;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) => _animateFling());
+  }
+
+  /// Find the front-most card at the given local position and select it.
+  void _handleTapAt(Offset localPos) {
+    final width = MediaQuery.of(context).size.width - 80;
+    const height = 200.0;
+    final radiusX = width * 0.40;
+    final radiusY = 60.0 * _perspective;
+    final angleStep = (2 * pi) / _totalCards;
+
+    int? bestIndex;
+    double bestScore = double.negativeInfinity;
+
+    for (int i = 0; i < _totalCards; i++) {
+      final angle = angleStep * i + _rotation;
+      final x = sin(angle) * radiusX;
+      final y = -cos(angle) * radiusY;
+      final depth = _perspective >= 0 ? cos(angle) : -cos(angle);
+      final scale = 0.65 + 0.35 * ((depth + 1) / 2);
+
+      final cardCenterX = width / 2 + x;
+      final cardCenterY = height / 2 + y;
+
+      final dx = localPos.dx - cardCenterX;
+      final dy = localPos.dy - cardCenterY;
+      final hitW = _cardWidth * scale / 2;
+      final hitH = _cardHeight * scale / 2;
+
+      if (dx.abs() < hitW && dy.abs() < hitH) {
+        if (depth > bestScore) {
+          bestScore = depth;
+          bestIndex = i;
+        }
+      }
+    }
+
+    if (bestIndex != null) {
+      _onCardTap(bestIndex);
+    }
   }
 
   void _onCardTap(int index) {
@@ -261,21 +303,12 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
             ),
           ],
           const SizedBox(height: 12),
-          // Carousel
-          RawGestureDetector(
-            gestures: <Type, GestureRecognizerFactory>{
-              _EagerPanGestureRecognizer:
-                  GestureRecognizerFactoryWithHandlers<
-                    _EagerPanGestureRecognizer
-                  >(() => _EagerPanGestureRecognizer(), (
-                    _EagerPanGestureRecognizer instance,
-                  ) {
-                    instance
-                      ..onStart = _onPanStart
-                      ..onUpdate = _onPanUpdate
-                      ..onEnd = _onPanEnd;
-                  }),
-            },
+          // Carousel — GestureDetector claims pan to block parent scroll; tap coexists
+          GestureDetector(
+            onTapUp: _onTapUp,
+            onPanStart: _onPanStart,
+            onPanUpdate: _onPanUpdate,
+            onPanEnd: _onPanEnd,
             behavior: HitTestBehavior.opaque,
             child: SizedBox(height: 200, child: _buildCarousel()),
           ),
@@ -360,35 +393,30 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
     );
   }
 
-  /// Pure 2D ellipse carousel — no Matrix4, no Transform widget.
+  /// Pure 2D ellipse carousel.
   Widget _buildCarousel() {
     final width = MediaQuery.of(context).size.width - 80;
     const height = 200.0;
 
     final radiusX = width * 0.40;
-    // Vertical radius is controlled by perspective: smaller = more top-down
     final radiusY = 60.0 * _perspective;
 
     final introT = _introAnim.value;
     final angleStep = (2 * pi) / _totalCards;
 
-    // Compute each card's 2D position on the ellipse
     final items = <_CardItem>[];
     for (int i = 0; i < _totalCards; i++) {
       final angle = _isShuffling
           ? angleStep * i * introT + _rotation
           : angleStep * i + _rotation;
 
-      // Ellipse position
       final x = sin(angle) * radiusX * introT;
       final y = -cos(angle) * radiusY * introT;
 
-      // Depth: cos(angle) goes from -1 (back) to +1 (front)
-      final depth = cos(angle);
+      // Depth flips based on viewing direction
+      final depth = _perspective >= 0 ? cos(angle) : -cos(angle);
 
-      // Scale: back cards smaller, front cards larger
       final scale = 0.65 + 0.35 * ((depth + 1) / 2);
-      // Opacity: back cards faded
       final opacity = 0.4 + 0.6 * ((depth + 1) / 2);
 
       items.add(
@@ -403,7 +431,7 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
       );
     }
 
-    // Stable sort by depth (back first) with index tiebreaker
+    // Stable sort: back first, index tiebreaker
     items.sort((a, b) {
       final cmp = (a.depth * 10000).round().compareTo(
         (b.depth * 10000).round(),
@@ -419,14 +447,21 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
         children: items.map((item) {
           final isSelected = _selectedIndexes.contains(item.index);
           final cx = width / 2 + item.x - _cardWidth / 2;
-          final cy =
-              height / 2 + item.y - _cardHeight / 2 + (isSelected ? -6 : 0);
+          final selectedOffset = isSelected ? -28.0 : 0.0;
 
           return Positioned(
             left: cx,
-            top: cy,
-            child: GestureDetector(
-              onTap: () => _onCardTap(item.index),
+            top: height / 2 + item.y - _cardHeight / 2,
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(end: selectedOffset),
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOutBack,
+              builder: (context, yOffset, child) {
+                return Transform.translate(
+                  offset: Offset(0, yOffset),
+                  child: child,
+                );
+              },
               child: _buildCard(item, isSelected),
             ),
           );
@@ -524,13 +559,4 @@ class _CardItem {
     required this.scale,
     required this.opacity,
   });
-}
-
-/// Eagerly claims the gesture arena to prevent parent ScrollView from competing.
-class _EagerPanGestureRecognizer extends PanGestureRecognizer {
-  @override
-  void addAllowedPointer(PointerDownEvent event) {
-    super.addAllowedPointer(event);
-    resolve(GestureDisposition.accepted);
-  }
 }
