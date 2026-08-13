@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:mind_insight/src/core/constant/app_color_resources.dart';
 import 'package:mind_insight/src/core/constant/app_dimensions.dart';
@@ -7,11 +8,12 @@ import 'package:mind_insight/src/core/constant/app_text_styles.dart';
 
 import 'genui_registry.dart';
 
-/// Card shuffle & selection widget — circular carousel style.
+/// Card shuffle & selection widget — smooth 2D ellipse carousel.
 ///
-/// Cards are arranged in a 3D circle. User swipes left/right to rotate the
-/// ring and taps a card to select it. Once all required cards are selected,
-/// confirm/cancel buttons appear.
+/// Cards sit on an elliptical ring. Horizontal swipe rotates the ring.
+/// Vertical swipe changes the ellipse "flatness" to simulate viewing angle
+/// (flat = top-down, tall = eye-level). No 3D transforms are used —
+/// only position, scale, and opacity for flicker-free rendering.
 class CardShuffleWidget extends StatefulWidget {
   const CardShuffleWidget({
     super.key,
@@ -19,11 +21,6 @@ class CardShuffleWidget extends StatefulWidget {
     required this.onAction,
   });
 
-  /// Expected keys in data:
-  /// - `requiredCards`: int — how many cards user must pick
-  /// - `spreadName`: String — name of the spread
-  /// - `positions`: list of strings — position labels
-  /// - `tarotSessionId`: int — ID to use for reveal
   final Map<String, dynamic> data;
   final GenUiActionCallback onAction;
 
@@ -32,64 +29,106 @@ class CardShuffleWidget extends StatefulWidget {
 }
 
 class _CardShuffleWidgetState extends State<CardShuffleWidget>
-    with TickerProviderStateMixin {
-  static const int _totalCards = 22; // Major Arcana pool
+    with SingleTickerProviderStateMixin {
+  static const int _totalCards = 22;
+  static const double _cardWidth = 52.0;
+  static const double _cardHeight = 82.0;
+
   final List<int> _selectedIndexes = [];
   late final int _requiredCards;
 
-  // Shuffle intro animation
-  late final AnimationController _shuffleController;
-  late final Animation<double> _shuffleAnimation;
+  // Intro animation
+  late final AnimationController _introController;
+  late final Animation<double> _introAnim;
   bool _isShuffling = true;
   bool _isConfirmed = false;
 
-  // Carousel rotation state
-  double _rotationAngle = 0.0; // current rotation in radians
-  double _dragStartAngle = 0.0;
+  // Ring state
+  double _rotation = 0.0; // radians, horizontal
+  double _perspective =
+      0.55; // 0 = flat (top-down), 1 = tall ellipse (eye-level side view)
 
-  // Momentum / fling animation
-  late AnimationController _flingController;
-  late Animation<double> _flingAnimation;
+  static const double _minPerspective = 0.15;
+  static const double _maxPerspective = 0.85;
+
+  // Fling
+  double _flingTarget = 0.0;
+  double _flingStart = 0.0;
+  bool _flinging = false;
+  double _flingProgress = 0.0;
 
   @override
   void initState() {
     super.initState();
     _requiredCards = widget.data['requiredCards'] as int? ?? 1;
 
-    _shuffleController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
+    _introController = AnimationController(
+      duration: const Duration(milliseconds: 1400),
       vsync: this,
     );
-    _shuffleAnimation = CurvedAnimation(
-      parent: _shuffleController,
-      curve: Curves.easeOutBack,
+    _introAnim = CurvedAnimation(
+      parent: _introController,
+      curve: Curves.easeOutCubic,
     );
-    _shuffleController.forward().then((_) {
+    _introController.addListener(() => setState(() {}));
+    _introController.forward().then((_) {
       if (mounted) setState(() => _isShuffling = false);
-    });
-
-    _flingController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-    _flingAnimation = Tween<double>(begin: 0, end: 0).animate(
-      CurvedAnimation(parent: _flingController, curve: Curves.easeOutCubic),
-    );
-    _flingController.addListener(() {
-      setState(() => _rotationAngle = _flingAnimation.value);
     });
   }
 
   @override
   void dispose() {
-    _shuffleController.dispose();
-    _flingController.dispose();
+    _introController.dispose();
     super.dispose();
+  }
+
+  // --- Gesture handling ---
+
+  void _onPanStart(DragStartDetails details) {
+    _flinging = false;
+  }
+
+  void _onPanUpdate(DragUpdateDetails details) {
+    if (_isShuffling || _isConfirmed) return;
+    setState(() {
+      _rotation += details.delta.dx * 0.005;
+      _perspective = (_perspective + details.delta.dy * 0.003).clamp(
+        _minPerspective,
+        _maxPerspective,
+      );
+    });
+  }
+
+  void _onPanEnd(DragEndDetails details) {
+    if (_isShuffling || _isConfirmed) return;
+    final vx = details.velocity.pixelsPerSecond.dx;
+    if (vx.abs() > 200) {
+      _flingStart = _rotation;
+      _flingTarget = _rotation + vx * 0.0015;
+      _flingProgress = 0.0;
+      _flinging = true;
+      _animateFling();
+    }
+  }
+
+  void _animateFling() {
+    if (!_flinging || !mounted) return;
+    _flingProgress += 0.04; // ~60fps step
+    if (_flingProgress >= 1.0) {
+      _flinging = false;
+      setState(() => _rotation = _flingTarget);
+      return;
+    }
+    // Ease-out curve
+    final t = 1.0 - pow(1.0 - _flingProgress, 3).toDouble();
+    setState(() {
+      _rotation = _flingStart + (_flingTarget - _flingStart) * t;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _animateFling());
   }
 
   void _onCardTap(int index) {
     if (_isShuffling || _isConfirmed) return;
-
     setState(() {
       if (_selectedIndexes.contains(index)) {
         _selectedIndexes.remove(index);
@@ -109,37 +148,10 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
   }
 
   void _onCancel() {
-    setState(() {
-      _selectedIndexes.clear();
-    });
+    setState(() => _selectedIndexes.clear());
   }
 
-  void _onPanStart(DragStartDetails details) {
-    _flingController.stop();
-    _dragStartAngle = _rotationAngle;
-  }
-
-  void _onPanUpdate(DragUpdateDetails details) {
-    if (_isShuffling || _isConfirmed) return;
-    setState(() {
-      _rotationAngle += details.delta.dx * 0.008;
-    });
-  }
-
-  void _onPanEnd(DragEndDetails details) {
-    if (_isShuffling || _isConfirmed) return;
-    // Fling with momentum
-    final velocity = details.velocity.pixelsPerSecond.dx * 0.005;
-    final endAngle = _rotationAngle + velocity;
-
-    _flingAnimation = Tween<double>(begin: _rotationAngle, end: endAngle)
-        .animate(
-          CurvedAnimation(parent: _flingController, curve: Curves.easeOutCubic),
-        );
-    _flingController
-      ..reset()
-      ..forward();
-  }
+  // --- Build ---
 
   @override
   Widget build(BuildContext context) {
@@ -193,7 +205,6 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
               ),
             ),
           ],
-          // Swipe hint
           if (!_isConfirmed && !_isShuffling) ...[
             const SizedBox(height: 2),
             Row(
@@ -201,13 +212,13 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
                 Icon(
                   Icons.swipe_rounded,
                   size: 14,
-                  color: ColorResources.muted.withValues(alpha: 0.6),
+                  color: ColorResources.muted.withValues(alpha: 0.5),
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '左右滑动旋转牌阵',
+                  '左右旋转 · 上下切换视角',
                   style: textSmall.copyWith(
-                    color: ColorResources.muted.withValues(alpha: 0.6),
+                    color: ColorResources.muted.withValues(alpha: 0.5),
                     fontSize: 11,
                   ),
                 ),
@@ -221,53 +232,54 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
               spacing: 6,
               runSpacing: 4,
               children: List.generate(positions.length, (i) {
-                final isSelected = i < _selectedIndexes.length;
+                final filled = i < _selectedIndexes.length;
                 return Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: isSelected
+                    color: filled
                         ? ColorResources.primary.withValues(alpha: 0.15)
                         : ColorResources.primarySoft,
                     borderRadius: BorderRadius.circular(16),
-                    border: isSelected
+                    border: filled
                         ? Border.all(color: ColorResources.primary, width: 1.5)
                         : null,
                   ),
                   child: Text(
                     positions[i],
                     style: textSmall.copyWith(
-                      color: isSelected
+                      color: filled
                           ? ColorResources.primary
                           : ColorResources.muted,
-                      fontWeight: isSelected
-                          ? FontWeight.w600
-                          : FontWeight.w400,
+                      fontWeight: filled ? FontWeight.w600 : FontWeight.w400,
                     ),
                   ),
                 );
               }),
             ),
           ],
-          const SizedBox(height: 16),
-          // Circular carousel
-          GestureDetector(
-            onPanStart: _onPanStart,
-            onPanUpdate: _onPanUpdate,
-            onPanEnd: _onPanEnd,
-            child: AnimatedBuilder(
-              animation: _shuffleAnimation,
-              builder: (context, _) {
-                return SizedBox(
-                  height: 200,
-                  child: Center(child: _buildCircularCarousel()),
-                );
-              },
-            ),
+          const SizedBox(height: 12),
+          // Carousel
+          RawGestureDetector(
+            gestures: <Type, GestureRecognizerFactory>{
+              _EagerPanGestureRecognizer:
+                  GestureRecognizerFactoryWithHandlers<
+                    _EagerPanGestureRecognizer
+                  >(() => _EagerPanGestureRecognizer(), (
+                    _EagerPanGestureRecognizer instance,
+                  ) {
+                    instance
+                      ..onStart = _onPanStart
+                      ..onUpdate = _onPanUpdate
+                      ..onEnd = _onPanEnd;
+                  }),
+            },
+            behavior: HitTestBehavior.opaque,
+            child: SizedBox(height: 200, child: _buildCarousel()),
           ),
-          // Confirm / Cancel buttons
+          // Buttons
           if (allSelected && !_isConfirmed) ...[
             const SizedBox(height: 16),
             Row(
@@ -323,7 +335,6 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
               ],
             ),
           ],
-          // Confirmed state indicator
           if (_isConfirmed) ...[
             const SizedBox(height: 12),
             Center(
@@ -349,67 +360,74 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
     );
   }
 
-  Widget _buildCircularCarousel() {
-    final containerWidth = MediaQuery.of(context).size.width - 80;
-    // Ellipse radii for the circular arrangement
-    final radiusX = containerWidth * 0.40; // horizontal radius
-    const radiusY = 50.0; // vertical radius (perspective squash)
+  /// Pure 2D ellipse carousel — no Matrix4, no Transform widget.
+  Widget _buildCarousel() {
+    final width = MediaQuery.of(context).size.width - 80;
+    const height = 200.0;
 
-    // Build card data with z-ordering
-    final cards = <_CarouselCard>[];
+    final radiusX = width * 0.40;
+    // Vertical radius is controlled by perspective: smaller = more top-down
+    final radiusY = 60.0 * _perspective;
+
+    final introT = _introAnim.value;
     final angleStep = (2 * pi) / _totalCards;
 
+    // Compute each card's 2D position on the ellipse
+    final items = <_CardItem>[];
     for (int i = 0; i < _totalCards; i++) {
-      // During shuffle intro, animate from stacked to circle
-      final effectiveAngle = _isShuffling
-          ? angleStep * i * _shuffleAnimation.value
-          : angleStep * i + _rotationAngle;
+      final angle = _isShuffling
+          ? angleStep * i * introT + _rotation
+          : angleStep * i + _rotation;
 
-      final x = sin(effectiveAngle) * radiusX;
-      final z = cos(effectiveAngle); // -1 to 1, back to front
+      // Ellipse position
+      final x = sin(angle) * radiusX * introT;
+      final y = -cos(angle) * radiusY * introT;
 
-      // Scale and opacity based on depth
-      final scale = 0.6 + 0.4 * ((z + 1) / 2); // 0.6 at back, 1.0 at front
-      final opacity = 0.4 + 0.6 * ((z + 1) / 2); // 0.4 at back, 1.0 at front
-      final yOffset =
-          -z * radiusY * _shuffleAnimation.value; // perspective Y shift
+      // Depth: cos(angle) goes from -1 (back) to +1 (front)
+      final depth = cos(angle);
 
-      cards.add(
-        _CarouselCard(
+      // Scale: back cards smaller, front cards larger
+      final scale = 0.65 + 0.35 * ((depth + 1) / 2);
+      // Opacity: back cards faded
+      final opacity = 0.4 + 0.6 * ((depth + 1) / 2);
+
+      items.add(
+        _CardItem(
           index: i,
           x: x,
-          y: yOffset,
-          z: z,
+          y: y,
+          depth: depth,
           scale: scale,
           opacity: opacity,
-          angle: effectiveAngle,
         ),
       );
     }
 
-    // Sort by z so back cards render first (painter's algorithm)
-    cards.sort((a, b) => a.z.compareTo(b.z));
+    // Stable sort by depth (back first) with index tiebreaker
+    items.sort((a, b) {
+      final cmp = (a.depth * 10000).round().compareTo(
+        (b.depth * 10000).round(),
+      );
+      return cmp != 0 ? cmp : a.index.compareTo(b.index);
+    });
 
     return SizedBox(
-      width: containerWidth,
-      height: 200,
+      width: width,
+      height: height,
       child: Stack(
-        alignment: Alignment.center,
         clipBehavior: Clip.none,
-        children: cards.map((card) {
-          final isSelected = _selectedIndexes.contains(card.index);
+        children: items.map((item) {
+          final isSelected = _selectedIndexes.contains(item.index);
+          final cx = width / 2 + item.x - _cardWidth / 2;
+          final cy =
+              height / 2 + item.y - _cardHeight / 2 + (isSelected ? -6 : 0);
+
           return Positioned(
-            left: (containerWidth / 2) + card.x - 28,
-            top: 55 + card.y + (isSelected ? -10 : 0),
+            left: cx,
+            top: cy,
             child: GestureDetector(
-              onTap: () => _onCardTap(card.index),
-              child: Transform.scale(
-                scale: card.scale,
-                child: Opacity(
-                  opacity: card.opacity.clamp(0.0, 1.0),
-                  child: _buildSingleCard(card.index, isSelected, card.z > 0.3),
-                ),
-              ),
+              onTap: () => _onCardTap(item.index),
+              child: _buildCard(item, isSelected),
             ),
           );
         }).toList(),
@@ -417,79 +435,102 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
     );
   }
 
-  Widget _buildSingleCard(int index, bool isSelected, bool isFront) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      width: 56,
-      height: 90,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: isSelected
-              ? ColorResources.primary
-              : ColorResources.primary.withValues(alpha: 0.3),
-          width: isSelected ? 2.5 : 1.5,
-        ),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isSelected
-              ? [
-                  ColorResources.primary.withValues(alpha: 0.25),
-                  ColorResources.primary.withValues(alpha: 0.08),
-                ]
-              : [const Color(0xFF3D2A6E), const Color(0xFF1A1035)],
-        ),
-        boxShadow: isSelected
-            ? [
-                BoxShadow(
-                  color: ColorResources.primary.withValues(alpha: 0.4),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isFront ? 0.25 : 0.1),
-                  blurRadius: isFront ? 8 : 3,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-      ),
-      child: Center(
-        child: isSelected
-            ? const Icon(
-                Icons.check_rounded,
-                color: ColorResources.primary,
-                size: 22,
+  Widget _buildCard(_CardItem item, bool isSelected) {
+    final isFront = item.depth > 0.2;
+    final alpha = item.opacity.clamp(0.0, 1.0);
+
+    return Transform.scale(
+      scale: item.scale,
+      child: Container(
+        width: _cardWidth,
+        height: _cardHeight,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected
+                ? ColorResources.primary.withValues(alpha: alpha)
+                : Colors.white.withValues(alpha: 0.15 * alpha),
+            width: isSelected ? 2.5 : 1,
+          ),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isSelected
+                ? [
+                    ColorResources.primary.withValues(alpha: 0.3 * alpha),
+                    ColorResources.primary.withValues(alpha: 0.1 * alpha),
+                  ]
+                : [
+                    Color.lerp(
+                      const Color(0xFF4A3580),
+                      const Color(0xFFFFF8EF),
+                      1 - alpha,
+                    )!,
+                    Color.lerp(
+                      const Color(0xFF1E1245),
+                      const Color(0xFFFFF8EF),
+                      1 - alpha,
+                    )!,
+                  ],
+          ),
+          boxShadow: [
+            if (isSelected)
+              BoxShadow(
+                color: ColorResources.primary.withValues(alpha: 0.4 * alpha),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               )
-            : Icon(
-                Icons.auto_awesome,
-                color: Colors.white.withValues(alpha: 0.4),
-                size: 16,
+            else
+              BoxShadow(
+                color: Colors.black.withValues(
+                  alpha: (isFront ? 0.2 : 0.08) * alpha,
+                ),
+                blurRadius: isFront ? 8 : 3,
+                offset: const Offset(0, 2),
               ),
+          ],
+        ),
+        child: Center(
+          child: isSelected
+              ? Icon(
+                  Icons.check_rounded,
+                  color: ColorResources.primary.withValues(alpha: alpha),
+                  size: 20,
+                )
+              : Icon(
+                  Icons.auto_awesome,
+                  color: Colors.white.withValues(alpha: 0.3 * alpha),
+                  size: 13,
+                ),
+        ),
       ),
     );
   }
 }
 
-/// Internal model to represent a card's position in the carousel.
-class _CarouselCard {
+class _CardItem {
   final int index;
   final double x;
   final double y;
-  final double z;
+  final double depth;
   final double scale;
   final double opacity;
-  final double angle;
 
-  const _CarouselCard({
+  const _CardItem({
     required this.index,
     required this.x,
     required this.y,
-    required this.z,
+    required this.depth,
     required this.scale,
     required this.opacity,
-    required this.angle,
   });
+}
+
+/// Eagerly claims the gesture arena to prevent parent ScrollView from competing.
+class _EagerPanGestureRecognizer extends PanGestureRecognizer {
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    super.addAllowedPointer(event);
+    resolve(GestureDisposition.accepted);
+  }
 }
