@@ -30,7 +30,7 @@ class _ChatPageState extends State<ChatPage> {
     super.initState();
     _chatController = InMemoryChatController(messages: _initialMessages());
     _dioClient = DioClient(
-      AppConstants.envConfig.agentBaseUrl,
+      AppConstants.envConfig.baseUrl,
       loggingInterceptor: LoggingInterceptor(),
     );
   }
@@ -118,7 +118,7 @@ class _ChatPageState extends State<ChatPage> {
 
     try {
       final response = await _dioClient.post(
-        AppConstants.chatUri,
+        AppConstants.agentChatUri,
         data: {
           'message': message,
           'user_id': _currentUserId,

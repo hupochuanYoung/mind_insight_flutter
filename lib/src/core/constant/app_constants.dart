@@ -3,13 +3,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class EnvConfig {
   final String envName;
   final String baseUrl;
-  final String agentBaseUrl;
 
-  EnvConfig({
-    required this.envName,
-    required this.baseUrl,
-    required this.agentBaseUrl,
-  });
+  EnvConfig({required this.envName, required this.baseUrl});
 }
 
 class AppConstants {
@@ -30,35 +25,82 @@ class AppConstants {
     }
   }
 
-  // dev — local agent service
+  // dev — local backend
   static final EnvConfig _devConfig = EnvConfig(
     envName: "DEV",
-    baseUrl: "http://127.0.0.1:8001",
-    agentBaseUrl: "http://127.0.0.1:8001",
+    baseUrl: "http://127.0.0.1:8081",
   );
 
   // prod
   static final EnvConfig _prodConfig = EnvConfig(
     envName: "PROD",
-    baseUrl: "http://127.0.0.1:8001",
-    agentBaseUrl: "http://127.0.0.1:8001",
+    baseUrl: "http://127.0.0.1:8081",
   );
 
   // ---------------------------------------------------------------------------
-  // URI helpers
+  // Auth
   // ---------------------------------------------------------------------------
 
-  static String getBaseUri(String url) {
-    return '/v1$url';
-  }
+  /// POST /api/auth/register
+  static String get registerUri => '/api/auth/register';
+
+  /// POST /api/auth/login
+  static String get loginUri => '/api/auth/login';
+
+  /// POST /api/auth/logout
+  static String get logoutUri => '/api/auth/logout';
+
+  /// POST /api/auth/wechat/login
+  static String get wechatLoginUri => '/api/auth/wechat/login';
 
   // ---------------------------------------------------------------------------
-  // Agent Chat API
+  // Profile
   // ---------------------------------------------------------------------------
 
-  /// POST /v1/chat — send a message to the tarot agent
-  static String get chatUri => getBaseUri('/chat');
+  /// GET /api/profile
+  /// PUT /api/profile
+  static String get profileUri => '/api/profile';
 
-  /// GET /health — agent service health check
-  static String get healthUri => '/health';
+  // ---------------------------------------------------------------------------
+  // Conversation
+  // ---------------------------------------------------------------------------
+
+  /// POST /api/conversations
+  /// GET  /api/conversations
+  static String get conversationsUri => '/api/conversations';
+
+  /// GET/PATCH/DELETE /api/conversations/{id}
+  static String conversationUri(int id) => '/api/conversations/$id';
+
+  /// POST /api/conversations/{id}/respond
+  static String conversationRespondUri(int id) =>
+      '/api/conversations/$id/respond';
+
+  /// GET /api/conversations/{id}/messages
+  static String conversationMessagesUri(int id) =>
+      '/api/conversations/$id/messages';
+
+  /// GET /api/conversations/{id}/events
+  static String conversationEventsUri(int id) =>
+      '/api/conversations/$id/events';
+
+  // ---------------------------------------------------------------------------
+  // Agent
+  // ---------------------------------------------------------------------------
+
+  /// POST /api/agent/chat
+  static String get agentChatUri => '/api/agent/chat';
+
+  // ---------------------------------------------------------------------------
+  // Tarot
+  // ---------------------------------------------------------------------------
+
+  /// POST /api/tarot/draws
+  static String get tarotDrawsUri => '/api/tarot/draws';
+
+  /// GET /api/tarot/draws/{id}
+  static String tarotDrawUri(int id) => '/api/tarot/draws/$id';
+
+  /// POST /api/tarot/draws/{id}/reveal
+  static String tarotDrawRevealUri(int id) => '/api/tarot/draws/$id/reveal';
 }
