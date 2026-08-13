@@ -8,7 +8,11 @@ import 'package:mind_insight/src/core/data/dio/dio_client.dart';
 import 'package:mind_insight/src/core/data/dio/logging_interceptor.dart';
 
 class ChatPage extends StatefulWidget {
-  const ChatPage({super.key});
+  const ChatPage({super.key, this.entryType});
+
+  /// The entry type from the home page (e.g. 'daily_fortune', 'worry', etc.).
+  /// When null, shows the generic chat experience.
+  final String? entryType;
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -70,14 +74,27 @@ class _ChatPageState extends State<ChatPage> {
 
   List<Message> _initialMessages() {
     final now = DateTime.now();
+    final greeting = _greetingForEntryType(widget.entryType);
     return [
       Message.text(
         id: _nextMessageId(),
         authorId: _assistantUserId,
         createdAt: now.subtract(const Duration(minutes: 1)),
-        text: '你好，我是你的塔罗向导。告诉我你想探索的问题，或者点击上方的提示开始。',
+        text: greeting,
       ),
     ];
+  }
+
+  String _greetingForEntryType(String? type) {
+    return switch (type) {
+      'daily_fortune' => '让我为你抽一张今日牌，看看今天的能量和提醒。准备好了吗？',
+      'worry' => '最近有什么让你放不下的事吗？可以慢慢说，我在听。',
+      'relationship' => '你想看看哪段关系？可以简单说说你们现在的状态。',
+      'career' => '最近是工作、学习，还是方向选择让你压力比较大？',
+      'choice' => '你现在纠结的两个选择分别是什么？说出来我们一起看看。',
+      'just_talk' => '今天不一定要抽牌，我们可以只是聊聊。你想说点什么？',
+      _ => '你好，我是你的塔罗向导。告诉我你想探索的问题，或者点击上方的提示开始。',
+    };
   }
 
   // ---------------------------------------------------------------------------

@@ -24,6 +24,7 @@ class RouteUri {
   static const String me = '/me';
 
   // Non-tab routes (add as features grow)
+  static const String chatSession = '/chat-session';
   static const String error = '/error';
 }
 
@@ -195,14 +196,16 @@ GoRouter appRouter(GlobalKey<NavigatorState> navigatorKey) {
       // -----------------------------------------------------------------------
       // Non-tab routes (pushed on top of the shell)
       // -----------------------------------------------------------------------
-      // Example: detail pages, settings, etc.
-      // GoRoute(
-      //   path: '/reading/:id',
-      //   pageBuilder: (context, state) => slideTransitionPage(
-      //     state: state,
-      //     child: ReadingDetailScreen(id: state.pathParameters['id']!),
-      //   ),
-      // ),
+      GoRoute(
+        path: RouteUri.chatSession,
+        pageBuilder: (context, state) {
+          final type = state.uri.queryParameters['type'] ?? 'daily_fortune';
+          return slideTransitionPage(
+            state: state,
+            child: ChatPage(entryType: type),
+          );
+        },
+      ),
     ],
   );
 }
