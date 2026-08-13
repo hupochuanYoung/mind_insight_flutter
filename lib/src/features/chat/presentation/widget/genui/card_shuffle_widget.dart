@@ -1,4 +1,5 @@
 import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:mind_insight/src/core/constant/app_color_resources.dart';
 import 'package:mind_insight/src/core/constant/app_dimensions.dart';
@@ -11,11 +12,7 @@ import 'genui_registry.dart';
 /// Tap a card to select it (highlighted), then confirm/cancel appears below.
 /// Once confirmed, calls reveal and locks the widget from further interaction.
 class CardShuffleWidget extends StatefulWidget {
-  const CardShuffleWidget({
-    super.key,
-    required this.data,
-    required this.onAction,
-  });
+  const CardShuffleWidget({super.key, required this.data, required this.onAction});
 
   /// Expected keys in data:
   /// - `requiredCards`: int — how many cards user must pick
@@ -29,8 +26,7 @@ class CardShuffleWidget extends StatefulWidget {
   State<CardShuffleWidget> createState() => _CardShuffleWidgetState();
 }
 
-class _CardShuffleWidgetState extends State<CardShuffleWidget>
-    with TickerProviderStateMixin {
+class _CardShuffleWidgetState extends State<CardShuffleWidget> with TickerProviderStateMixin {
   static const int _totalCards = 22; // Major Arcana pool
   final List<int> _selectedIndexes = [];
   late final int _requiredCards;
@@ -43,14 +39,8 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
   void initState() {
     super.initState();
     _requiredCards = widget.data['requiredCards'] as int? ?? 1;
-    _shuffleController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
-      vsync: this,
-    );
-    _shuffleAnimation = CurvedAnimation(
-      parent: _shuffleController,
-      curve: Curves.easeOutBack,
-    );
+    _shuffleController = AnimationController(duration: const Duration(milliseconds: 1200), vsync: this);
+    _shuffleAnimation = CurvedAnimation(parent: _shuffleController, curve: Curves.easeOutBack);
     // Start shuffle animation
     _shuffleController.forward().then((_) {
       if (mounted) setState(() => _isShuffling = false);
@@ -78,10 +68,7 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
   void _onConfirm() {
     if (_selectedIndexes.length != _requiredCards) return;
     setState(() => _isConfirmed = true);
-    widget.onAction('reveal_cards', {
-      ...widget.data,
-      'selectedIndexes': _selectedIndexes,
-    });
+    widget.onAction('reveal_cards', {...widget.data, 'selectedIndexes': _selectedIndexes});
   }
 
   void _onCancel() {
@@ -92,11 +79,7 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
 
   @override
   Widget build(BuildContext context) {
-    final positions =
-        (widget.data['positions'] as List<dynamic>?)
-            ?.map((e) => e.toString())
-            .toList() ??
-        [];
+    final positions = (widget.data['positions'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
     final remaining = _requiredCards - _selectedIndexes.length;
     final allSelected = _selectedIndexes.length == _requiredCards;
 
@@ -114,11 +97,7 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
           // Header
           Row(
             children: [
-              const Icon(
-                Icons.style_rounded,
-                size: 20,
-                color: ColorResources.primary,
-              ),
+              const Icon(Icons.style_rounded, size: 20, color: ColorResources.primary),
               const SizedBox(width: 8),
               Text(
                 _isConfirmed
@@ -135,9 +114,7 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
             Text(
               remaining > 0 ? '还需选择 $remaining 张' : '已选好，请确认',
               style: textSmall.copyWith(
-                color: allSelected
-                    ? ColorResources.primary
-                    : ColorResources.muted,
+                color: allSelected ? ColorResources.primary : ColorResources.muted,
                 fontWeight: allSelected ? FontWeight.w600 : FontWeight.w400,
               ),
             ),
@@ -151,28 +128,17 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
               children: List.generate(positions.length, (i) {
                 final isSelected = i < _selectedIndexes.length;
                 return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: isSelected
-                        ? ColorResources.primary.withValues(alpha: 0.15)
-                        : ColorResources.primarySoft,
+                    color: isSelected ? ColorResources.primary.withValues(alpha: 0.15) : ColorResources.primarySoft,
                     borderRadius: BorderRadius.circular(16),
-                    border: isSelected
-                        ? Border.all(color: ColorResources.primary, width: 1.5)
-                        : null,
+                    border: isSelected ? Border.all(color: ColorResources.primary, width: 1.5) : null,
                   ),
                   child: Text(
                     positions[i],
                     style: textSmall.copyWith(
-                      color: isSelected
-                          ? ColorResources.primary
-                          : ColorResources.muted,
-                      fontWeight: isSelected
-                          ? FontWeight.w600
-                          : FontWeight.w400,
+                      color: isSelected ? ColorResources.primary : ColorResources.muted,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                     ),
                   ),
                 );
@@ -184,10 +150,7 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
           AnimatedBuilder(
             animation: _shuffleAnimation,
             builder: (context, _) {
-              return SizedBox(
-                height: 160,
-                child: Center(child: _buildCardFan()),
-              );
+              return SizedBox(height: 160, child: Center(child: _buildCardFan()));
             },
           ),
           // Confirm / Cancel buttons (shown when selection is complete)
@@ -201,17 +164,10 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
                     style: OutlinedButton.styleFrom(
                       foregroundColor: ColorResources.muted,
                       side: const BorderSide(color: ColorResources.border),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(
-                          Dimensions.radiusDefault,
-                        ),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Dimensions.radiusDefault)),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
-                    child: Text(
-                      '重新选择',
-                      style: textMedium.copyWith(color: ColorResources.muted),
-                    ),
+                    child: Text('重新选择', style: textMedium.copyWith(color: ColorResources.muted)),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -223,11 +179,7 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
                       backgroundColor: ColorResources.primary,
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(
-                          Dimensions.radiusDefault,
-                        ),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Dimensions.radiusDefault)),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                     child: Row(
@@ -235,10 +187,7 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
                       children: [
                         const Icon(Icons.check_rounded, size: 18),
                         const SizedBox(width: 6),
-                        Text(
-                          '确认翻牌',
-                          style: textBoldLarge.copyWith(color: Colors.white),
-                        ),
+                        Text('确认翻牌', style: textBoldLarge.copyWith(color: Colors.white)),
                       ],
                     ),
                   ),
@@ -253,16 +202,9 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.check_circle_rounded,
-                    size: 16,
-                    color: ColorResources.teal,
-                  ),
+                  Icon(Icons.check_circle_rounded, size: 16, color: ColorResources.teal),
                   const SizedBox(width: 6),
-                  Text(
-                    '已确认，正在翻牌...',
-                    style: textSmall.copyWith(color: ColorResources.teal),
-                  ),
+                  Text('已确认，正在翻牌...', style: textSmall.copyWith(color: ColorResources.teal)),
                 ],
               ),
             ),
@@ -286,13 +228,8 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
           final isSelected = _selectedIndexes.contains(i);
           final normalizedIndex = i - (displayCount / 2);
           final angle = normalizedIndex * 0.08 * _shuffleAnimation.value;
-          final xOffset =
-              normalizedIndex *
-              (fanWidth / displayCount) *
-              0.7 *
-              _shuffleAnimation.value;
-          final yOffset =
-              (normalizedIndex.abs() * 4.0) * _shuffleAnimation.value;
+          final xOffset = normalizedIndex * (fanWidth / displayCount) * 0.7 * _shuffleAnimation.value;
+          final yOffset = (normalizedIndex.abs() * 4.0) * _shuffleAnimation.value;
 
           return AnimatedPositioned(
             duration: const Duration(milliseconds: 300),
@@ -303,10 +240,7 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
               onTap: () => _onCardTap(i),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                child: Transform.rotate(
-                  angle: angle,
-                  child: _buildSingleCard(i, isSelected),
-                ),
+                child: Transform.rotate(angle: angle, child: _buildSingleCard(i, isSelected)),
               ),
             ),
           );
@@ -322,19 +256,14 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: isSelected
-              ? ColorResources.primary
-              : ColorResources.primary.withValues(alpha: 0.3),
+          color: isSelected ? ColorResources.primary : ColorResources.primary.withValues(alpha: 0.3),
           width: isSelected ? 2.5 : 1.5,
         ),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: isSelected
-              ? [
-                  ColorResources.primary.withValues(alpha: 0.25),
-                  ColorResources.primary.withValues(alpha: 0.08),
-                ]
+              ? [ColorResources.primary.withValues(alpha: 0.25), ColorResources.primary.withValues(alpha: 0.08)]
               : [const Color(0xFF3D2A6E), const Color(0xFF1A1035)],
         ),
         boxShadow: isSelected
@@ -345,26 +274,12 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
                   offset: const Offset(0, 2),
                 ),
               ]
-            : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.15),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+            : [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 4, offset: const Offset(0, 2))],
       ),
       child: Center(
         child: isSelected
-            ? const Icon(
-                Icons.check_rounded,
-                color: ColorResources.primary,
-                size: 22,
-              )
-            : Icon(
-                Icons.auto_awesome,
-                color: Colors.white.withValues(alpha: 0.4),
-                size: 16,
-              ),
+            ? const Icon(Icons.check_rounded, color: ColorResources.primary, size: 22)
+            : Icon(Icons.auto_awesome, color: Colors.white.withValues(alpha: 0.4), size: 16),
       ),
     );
   }
