@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mind_insight/di_container.dart';
 import 'package:mind_insight/src/core/component/portal_master_layout.dart';
+import 'package:mind_insight/src/features/auth/data/datasource/auth_local_datasource.dart';
+import 'package:mind_insight/src/features/auth/presentation/screen/login_screen.dart';
 import 'package:mind_insight/src/features/chat/presentation/screen/chat_page.dart';
 import 'package:mind_insight/src/features/home/presentation/screen/home_page.dart';
 import 'package:mind_insight/src/features/home/presentation/screen/me_page.dart';
@@ -11,6 +14,9 @@ import 'package:mind_insight/src/features/home/presentation/screen/me_page.dart'
 
 class RouteUri {
   const RouteUri._();
+
+  // Auth routes
+  static const String login = '/login';
 
   // Tab routes
   static const String home = '/home';
@@ -81,8 +87,10 @@ CustomTransitionPage<T> slideTransitionPage<T>({
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
       const begin = Offset(1.0, 0);
       const end = Offset.zero;
-      final tween = Tween(begin: begin, end: end)
-          .chain(CurveTween(curve: Curves.ease));
+      final tween = Tween(
+        begin: begin,
+        end: end,
+      ).chain(CurveTween(curve: Curves.ease));
       return SlideTransition(position: animation.drive(tween), child: child);
     },
   );
@@ -98,8 +106,10 @@ CustomTransitionPage<T> slideTopDownTransitionPage<T>({
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
       const begin = Offset(0, -1.0);
       const end = Offset.zero;
-      final tween = Tween(begin: begin, end: end)
-          .chain(CurveTween(curve: Curves.ease));
+      final tween = Tween(
+        begin: begin,
+        end: end,
+      ).chain(CurveTween(curve: Curves.ease));
       return SlideTransition(position: animation.drive(tween), child: child);
     },
   );
@@ -113,10 +123,31 @@ GoRouter appRouter(GlobalKey<NavigatorState> navigatorKey) {
   return GoRouter(
     initialLocation: RouteUri.home,
     navigatorKey: navigatorKey,
-    errorBuilder: (context, state) => const Scaffold(
-      body: Center(child: Text('Page not found')),
-    ),
+    redirect: (context, state) {
+      final token = sl<AuthLocalDatasource>().getToken();
+      final isLoggedIn = token != null && token.isNotEmpty;
+      final isOnLogin = state.matchedLocation == RouteUri.login;
+
+      // Not logged in and not on login page → redirect to login
+      if (!isLoggedIn && !isOnLogin) return RouteUri.login;
+
+      // Logged in but still on login page → redirect to home
+      if (isLoggedIn && isOnLogin) return RouteUri.home;
+
+      return null; // no redirect
+    },
+    errorBuilder: (context, state) =>
+        const Scaffold(body: Center(child: Text('Page not found'))),
     routes: [
+      // -----------------------------------------------------------------------
+      // Login route (outside shell — no bottom nav)
+      // -----------------------------------------------------------------------
+      GoRoute(
+        path: RouteUri.login,
+        pageBuilder: (context, state) =>
+            fadeTransitionPage(state: state, child: const LoginScreen()),
+      ),
+
       // -----------------------------------------------------------------------
       // Bottom navigation shell — preserves state across tabs
       // -----------------------------------------------------------------------
