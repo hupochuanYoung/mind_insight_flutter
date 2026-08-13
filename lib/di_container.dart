@@ -4,6 +4,15 @@ import 'src/core/constant/app_constants.dart';
 import 'src/core/data/dio/dio_client.dart';
 import 'src/core/data/dio/logging_interceptor.dart';
 
+// Auth feature
+import 'src/features/auth/business/repository/auth_repository.dart';
+import 'src/features/auth/business/usecase/login_usecase.dart';
+import 'src/features/auth/business/usecase/logout_usecase.dart';
+import 'src/features/auth/business/usecase/register_usecase.dart';
+import 'src/features/auth/data/datasource/auth_remote_datasource.dart';
+import 'src/features/auth/data/repository/auth_repository_impl.dart';
+import 'src/features/auth/presentation/provider/auth_provider.dart';
+
 // Chat feature
 import 'src/features/chat/business/repository/chat_repository.dart';
 import 'src/features/chat/business/usecase/chat_with_agent_usecase.dart';
@@ -19,9 +28,6 @@ import 'src/features/chat/presentation/provider/chat_provider.dart';
 // Profile feature
 import 'src/features/profile/business/repository/profile_repository.dart';
 import 'src/features/profile/business/usecase/get_profile_usecase.dart';
-import 'src/features/profile/business/usecase/login_usecase.dart';
-import 'src/features/profile/business/usecase/logout_usecase.dart';
-import 'src/features/profile/data/datasource/auth_remote_datasource.dart';
 import 'src/features/profile/data/datasource/profile_remote_datasource.dart';
 import 'src/features/profile/data/repository/profile_repository_impl.dart';
 import 'src/features/profile/presentation/provider/profile_provider.dart';
@@ -45,7 +51,39 @@ Future<void> initDependencies() async {
   );
 
   // ---------------------------------------------------------------------------
-  // Chat Feature — Data Layer
+  // Auth Feature
+  // ---------------------------------------------------------------------------
+
+  sl.registerLazySingleton<AuthRemoteDatasource>(
+    () => AuthRemoteDatasource(dioClient: sl<DioClient>()),
+  );
+
+  sl.registerLazySingleton<AuthRepository>(
+    () => AuthRepositoryImpl(authRemote: sl<AuthRemoteDatasource>()),
+  );
+
+  sl.registerLazySingleton<LoginUseCase>(
+    () => LoginUseCase(repository: sl<AuthRepository>()),
+  );
+
+  sl.registerLazySingleton<LogoutUseCase>(
+    () => LogoutUseCase(repository: sl<AuthRepository>()),
+  );
+
+  sl.registerLazySingleton<RegisterUseCase>(
+    () => RegisterUseCase(repository: sl<AuthRepository>()),
+  );
+
+  sl.registerFactory<AuthProvider>(
+    () => AuthProvider(
+      loginUseCase: sl<LoginUseCase>(),
+      logoutUseCase: sl<LogoutUseCase>(),
+      registerUseCase: sl<RegisterUseCase>(),
+    ),
+  );
+
+  // ---------------------------------------------------------------------------
+  // Chat Feature
   // ---------------------------------------------------------------------------
 
   sl.registerLazySingleton<AgentRemoteDatasource>(
@@ -68,10 +106,6 @@ Future<void> initDependencies() async {
     ),
   );
 
-  // ---------------------------------------------------------------------------
-  // Chat Feature — Business Layer (Use Cases)
-  // ---------------------------------------------------------------------------
-
   sl.registerLazySingleton<ChatWithAgentUseCase>(
     () => ChatWithAgentUseCase(repository: sl<ChatRepository>()),
   );
@@ -88,10 +122,6 @@ Future<void> initDependencies() async {
     () => InterpretTarotCardsUseCase(repository: sl<ChatRepository>()),
   );
 
-  // ---------------------------------------------------------------------------
-  // Chat Feature — Presentation Layer
-  // ---------------------------------------------------------------------------
-
   sl.registerFactory<ChatProvider>(
     () => ChatProvider(
       chatWithAgentUseCase: sl<ChatWithAgentUseCase>(),
@@ -102,49 +132,22 @@ Future<void> initDependencies() async {
   );
 
   // ---------------------------------------------------------------------------
-  // Profile Feature — Data Layer
+  // Profile Feature
   // ---------------------------------------------------------------------------
-
-  sl.registerLazySingleton<AuthRemoteDatasource>(
-    () => AuthRemoteDatasource(dioClient: sl<DioClient>()),
-  );
 
   sl.registerLazySingleton<ProfileRemoteDatasource>(
     () => ProfileRemoteDatasource(dioClient: sl<DioClient>()),
   );
 
   sl.registerLazySingleton<ProfileRepository>(
-    () => ProfileRepositoryImpl(
-      authRemote: sl<AuthRemoteDatasource>(),
-      profileRemote: sl<ProfileRemoteDatasource>(),
-    ),
-  );
-
-  // ---------------------------------------------------------------------------
-  // Profile Feature — Business Layer (Use Cases)
-  // ---------------------------------------------------------------------------
-
-  sl.registerLazySingleton<LoginUseCase>(
-    () => LoginUseCase(repository: sl<ProfileRepository>()),
-  );
-
-  sl.registerLazySingleton<LogoutUseCase>(
-    () => LogoutUseCase(repository: sl<ProfileRepository>()),
+    () => ProfileRepositoryImpl(profileRemote: sl<ProfileRemoteDatasource>()),
   );
 
   sl.registerLazySingleton<GetProfileUseCase>(
     () => GetProfileUseCase(repository: sl<ProfileRepository>()),
   );
 
-  // ---------------------------------------------------------------------------
-  // Profile Feature — Presentation Layer
-  // ---------------------------------------------------------------------------
-
   sl.registerFactory<ProfileProvider>(
-    () => ProfileProvider(
-      loginUseCase: sl<LoginUseCase>(),
-      logoutUseCase: sl<LogoutUseCase>(),
-      getProfileUseCase: sl<GetProfileUseCase>(),
-    ),
+    () => ProfileProvider(getProfileUseCase: sl<GetProfileUseCase>()),
   );
 }

@@ -5,7 +5,7 @@ import '../../../../core/constant/app_constants.dart';
 import '../../../../core/data/dio/dio_client.dart';
 import '../../../../core/data/exception/api_error_handler.dart';
 import '../../../../core/data/exception/failure.dart';
-import '../model/agent_chat_request.dart';
+import '../../business/param/agent_chat_param.dart';
 import '../model/agent_chat_model.dart';
 
 /// Remote data source for Agent chat API.
@@ -16,11 +16,11 @@ class AgentRemoteDatasource {
     : _dioClient = dioClient;
 
   /// POST /api/agent/chat
-  Future<Either<Failure, AgentChatModel>> chat(AgentChatRequest request) async {
+  Future<Either<Failure, AgentChatModel>> chat(AgentChatParam param) async {
     try {
       final response = await _dioClient.post(
         AppConstants.agentChatUri,
-        data: request.toJson(),
+        data: param.toJson(),
       );
 
       final body = response.data as Map<String, dynamic>;
@@ -35,8 +35,10 @@ class AgentRemoteDatasource {
         );
       }
 
-      final vo = AgentChatModel.fromJson(body['data'] as Map<String, dynamic>);
-      return right(vo);
+      final model = AgentChatModel.fromJson(
+        body['data'] as Map<String, dynamic>,
+      );
+      return right(model);
     } on DioException catch (e) {
       return left(
         ConnectionFailure(errorMessage: ApiErrorHandler.getMessage(e)),

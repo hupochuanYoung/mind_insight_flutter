@@ -1,7 +1,7 @@
-class CreateMessageRequest {
+class CreateMessageParam {
   final String content;
 
-  const CreateMessageRequest({required this.content});
+  const CreateMessageParam({required this.content});
 
   Map<String, dynamic> toJson() => {
         'content': content,

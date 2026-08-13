@@ -1,8 +1,8 @@
-class CreateConversationRequest {
+class CreateConversationParam {
   final String type;
   final String? title;
 
-  const CreateConversationRequest({
+  const CreateConversationParam({
     required this.type,
     this.title,
   });

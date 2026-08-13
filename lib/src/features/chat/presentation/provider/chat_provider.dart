@@ -1,13 +1,13 @@
 import 'package:flutter/foundation.dart';
 
+import '../../business/param/agent_chat_param.dart';
+import '../../business/param/create_tarot_draw_param.dart';
+import '../../business/param/reveal_tarot_cards_param.dart';
 import '../../business/usecase/chat_with_agent_usecase.dart';
 import '../../business/usecase/create_tarot_draw_usecase.dart';
 import '../../business/usecase/interpret_tarot_cards_usecase.dart';
 import '../../business/usecase/reveal_tarot_cards_usecase.dart';
 import '../../data/model/agent_chat_model.dart';
-import '../../data/model/agent_chat_request.dart';
-import '../../data/model/create_tarot_draw_request.dart';
-import '../../data/model/reveal_tarot_cards_request.dart';
 import '../../data/model/tarot_reveal_model.dart';
 import '../../data/model/tarot_session_model.dart';
 
@@ -66,14 +66,14 @@ class ChatProvider extends ChangeNotifier {
     _errorMessage = null;
     _notify();
 
-    final request = AgentChatRequest(
+    final param = AgentChatParam(
       conversationId: _currentConversationId,
       agentType: agentType,
       title: title,
       message: message,
     );
 
-    final result = await _chatWithAgentUseCase.call(request);
+    final result = await _chatWithAgentUseCase.call(param);
 
     result.fold(
       (failure) {
@@ -96,12 +96,12 @@ class ChatProvider extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   /// Create a new tarot draw session.
-  Future<void> createTarotDraw(CreateTarotDrawRequest request) async {
+  Future<void> createTarotDraw(CreateTarotDrawParam param) async {
     _isLoading = true;
     _errorMessage = null;
     _notify();
 
-    final result = await _createTarotDrawUseCase.call(request);
+    final result = await _createTarotDrawUseCase.call(param);
 
     result.fold(
       (failure) {
@@ -126,9 +126,9 @@ class ChatProvider extends ChangeNotifier {
     _notify();
 
     final result = await _revealTarotCardsUseCase.call(
-      RevealTarotCardsParams(
+      RevealTarotCardsParam(
         tarotSessionId: tarotSessionId,
-        request: RevealTarotCardsRequest(selectedIndexes: selectedIndexes),
+        selectedIndexes: selectedIndexes,
       ),
     );
 

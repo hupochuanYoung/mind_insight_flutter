@@ -5,13 +5,13 @@ import '../../../../core/constant/app_constants.dart';
 import '../../../../core/data/dio/dio_client.dart';
 import '../../../../core/data/exception/api_error_handler.dart';
 import '../../../../core/data/exception/failure.dart';
+import '../../business/param/create_conversation_param.dart';
+import '../../business/param/create_message_param.dart';
+import '../../business/param/update_conversation_param.dart';
 import '../model/conversation_event_model.dart';
 import '../model/conversation_message_model.dart';
 import '../model/conversation_model.dart';
 import '../model/conversation_reply_model.dart';
-import '../model/create_conversation_request.dart';
-import '../model/create_message_request.dart';
-import '../model/update_conversation_request.dart';
 
 /// Remote data source for Conversation API.
 class ConversationRemoteDatasource {
@@ -22,12 +22,12 @@ class ConversationRemoteDatasource {
 
   /// POST /api/conversations
   Future<Either<Failure, ConversationModel>> createConversation(
-    CreateConversationRequest request,
+    CreateConversationParam param,
   ) async {
     try {
       final response = await _dioClient.post(
         AppConstants.conversationsUri,
-        data: request.toJson(),
+        data: param.toJson(),
       );
       final body = response.data as Map<String, dynamic>;
       final code = body['code'] as int? ?? -1;
@@ -119,12 +119,12 @@ class ConversationRemoteDatasource {
   /// PATCH /api/conversations/{id}
   Future<Either<Failure, ConversationModel>> updateConversation(
     int id,
-    UpdateConversationRequest request,
+    UpdateConversationParam param,
   ) async {
     try {
       final response = await _dioClient.put(
         AppConstants.conversationUri(id),
-        data: request.toJson(),
+        data: param.toJson(),
       );
       final body = response.data as Map<String, dynamic>;
       final code = body['code'] as int? ?? -1;
@@ -181,12 +181,12 @@ class ConversationRemoteDatasource {
   /// POST /api/conversations/{id}/respond
   Future<Either<Failure, ConversationReplyModel>> respond(
     int id,
-    CreateMessageRequest request,
+    CreateMessageParam param,
   ) async {
     try {
       final response = await _dioClient.post(
         AppConstants.conversationRespondUri(id),
-        data: request.toJson(),
+        data: param.toJson(),
       );
       final body = response.data as Map<String, dynamic>;
       final code = body['code'] as int? ?? -1;

@@ -5,8 +5,8 @@ import '../../../../core/constant/app_constants.dart';
 import '../../../../core/data/dio/dio_client.dart';
 import '../../../../core/data/exception/api_error_handler.dart';
 import '../../../../core/data/exception/failure.dart';
+import '../../business/param/profile_update_param.dart';
 import '../model/profile_model.dart';
-import '../model/profile_update_request.dart';
 
 /// Remote data source for Profile API.
 class ProfileRemoteDatasource {
@@ -43,12 +43,12 @@ class ProfileRemoteDatasource {
 
   /// PUT /api/profile
   Future<Either<Failure, ProfileModel>> updateProfile(
-    ProfileUpdateRequest request,
+    ProfileUpdateParam param,
   ) async {
     try {
       final response = await _dioClient.put(
         AppConstants.profileUri,
-        data: request.toJson(),
+        data: param.toJson(),
       );
       final body = response.data as Map<String, dynamic>;
       final code = body['code'] as int? ?? -1;

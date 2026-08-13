@@ -1,4 +1,4 @@
-class CreateTarotDrawRequest {
+class CreateTarotDrawParam {
   final int conversationId;
   final String question;
   final String? questionSummary;
@@ -19,7 +19,7 @@ class CreateTarotDrawRequest {
   final List<dynamic>? agentActions;
   final Map<String, dynamic>? agentText;
 
-  const CreateTarotDrawRequest({
+  const CreateTarotDrawParam({
     required this.conversationId,
     required this.question,
     this.questionSummary,

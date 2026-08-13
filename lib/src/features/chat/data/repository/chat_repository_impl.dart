@@ -1,23 +1,23 @@
 import 'package:dartz/dartz.dart';
 
 import '../../../../core/data/exception/failure.dart';
+import '../../business/param/agent_chat_param.dart';
+import '../../business/param/create_conversation_param.dart';
+import '../../business/param/create_message_param.dart';
+import '../../business/param/create_tarot_draw_param.dart';
+import '../../business/param/reveal_tarot_cards_param.dart';
+import '../../business/param/update_conversation_param.dart';
 import '../../business/repository/chat_repository.dart';
 import '../datasource/agent_remote_datasource.dart';
 import '../datasource/conversation_remote_datasource.dart';
 import '../datasource/tarot_remote_datasource.dart';
 import '../model/agent_chat_model.dart';
-import '../model/agent_chat_request.dart';
 import '../model/conversation_event_model.dart';
 import '../model/conversation_message_model.dart';
 import '../model/conversation_model.dart';
 import '../model/conversation_reply_model.dart';
-import '../model/create_conversation_request.dart';
-import '../model/create_message_request.dart';
-import '../model/create_tarot_draw_request.dart';
-import '../model/reveal_tarot_cards_request.dart';
 import '../model/tarot_reveal_model.dart';
 import '../model/tarot_session_model.dart';
-import '../model/update_conversation_request.dart';
 
 /// Concrete [ChatRepository] implementation.
 ///
@@ -40,9 +40,8 @@ class ChatRepositoryImpl implements ChatRepository {
   // ---------------------------------------------------------------------------
 
   @override
-  Future<Either<Failure, AgentChatModel>> chatWithAgent(
-    AgentChatRequest request,
-  ) => _agentRemote.chat(request);
+  Future<Either<Failure, AgentChatModel>> chatWithAgent(AgentChatParam param) =>
+      _agentRemote.chat(param);
 
   // ---------------------------------------------------------------------------
   // Conversation
@@ -50,8 +49,8 @@ class ChatRepositoryImpl implements ChatRepository {
 
   @override
   Future<Either<Failure, ConversationModel>> createConversation(
-    CreateConversationRequest request,
-  ) => _conversationRemote.createConversation(request);
+    CreateConversationParam param,
+  ) => _conversationRemote.createConversation(param);
 
   @override
   Future<Either<Failure, List<ConversationModel>>> listConversations({
@@ -69,8 +68,8 @@ class ChatRepositoryImpl implements ChatRepository {
   @override
   Future<Either<Failure, ConversationModel>> updateConversation(
     int id,
-    UpdateConversationRequest request,
-  ) => _conversationRemote.updateConversation(id, request);
+    UpdateConversationParam param,
+  ) => _conversationRemote.updateConversation(id, param);
 
   @override
   Future<Either<Failure, void>> deleteConversation(int id) =>
@@ -79,8 +78,8 @@ class ChatRepositoryImpl implements ChatRepository {
   @override
   Future<Either<Failure, ConversationReplyModel>> respond(
     int id,
-    CreateMessageRequest request,
-  ) => _conversationRemote.respond(id, request);
+    CreateMessageParam param,
+  ) => _conversationRemote.respond(id, param);
 
   @override
   Future<Either<Failure, List<ConversationMessageModel>>> listMessages(
@@ -103,8 +102,8 @@ class ChatRepositoryImpl implements ChatRepository {
 
   @override
   Future<Either<Failure, TarotSessionModel>> createTarotDraw(
-    CreateTarotDrawRequest request,
-  ) => _tarotRemote.createDraw(request);
+    CreateTarotDrawParam param,
+  ) => _tarotRemote.createDraw(param);
 
   @override
   Future<Either<Failure, TarotSessionModel>> getTarotDraw(int id) =>
@@ -113,8 +112,8 @@ class ChatRepositoryImpl implements ChatRepository {
   @override
   Future<Either<Failure, TarotRevealModel>> revealTarotCards(
     int id,
-    RevealTarotCardsRequest request,
-  ) => _tarotRemote.revealCards(id, request);
+    RevealTarotCardsParam param,
+  ) => _tarotRemote.revealCards(id, param);
 
   @override
   Future<Either<Failure, TarotRevealModel>> interpretTarotCards(int id) =>

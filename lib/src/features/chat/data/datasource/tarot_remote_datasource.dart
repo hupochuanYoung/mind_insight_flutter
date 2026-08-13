@@ -5,8 +5,8 @@ import '../../../../core/constant/app_constants.dart';
 import '../../../../core/data/dio/dio_client.dart';
 import '../../../../core/data/exception/api_error_handler.dart';
 import '../../../../core/data/exception/failure.dart';
-import '../model/create_tarot_draw_request.dart';
-import '../model/reveal_tarot_cards_request.dart';
+import '../../business/param/create_tarot_draw_param.dart';
+import '../../business/param/reveal_tarot_cards_param.dart';
 import '../model/tarot_reveal_model.dart';
 import '../model/tarot_session_model.dart';
 
@@ -19,12 +19,12 @@ class TarotRemoteDatasource {
 
   /// POST /api/tarot/draws
   Future<Either<Failure, TarotSessionModel>> createDraw(
-    CreateTarotDrawRequest request,
+    CreateTarotDrawParam param,
   ) async {
     try {
       final response = await _dioClient.post(
         AppConstants.tarotDrawsUri,
-        data: request.toJson(),
+        data: param.toJson(),
       );
       final body = response.data as Map<String, dynamic>;
       final code = body['code'] as int? ?? -1;
@@ -81,12 +81,12 @@ class TarotRemoteDatasource {
   /// POST /api/tarot/draws/{id}/reveal
   Future<Either<Failure, TarotRevealModel>> revealCards(
     int id,
-    RevealTarotCardsRequest request,
+    RevealTarotCardsParam param,
   ) async {
     try {
       final response = await _dioClient.post(
         AppConstants.tarotDrawRevealUri(id),
-        data: request.toJson(),
+        data: param.toJson(),
       );
       final body = response.data as Map<String, dynamic>;
       final code = body['code'] as int? ?? -1;

@@ -1,9 +1,9 @@
-class ProfileUpdateRequest {
+class ProfileUpdateParam {
   final String? nickname;
   final String? avatar;
   final int? gender;
 
-  const ProfileUpdateRequest({
+  const ProfileUpdateParam({
     this.nickname,
     this.avatar,
     this.gender,

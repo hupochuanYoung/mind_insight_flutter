@@ -1,7 +1,7 @@
-class UpdateConversationRequest {
+class UpdateConversationParam {
   final String title;
 
-  const UpdateConversationRequest({required this.title});
+  const UpdateConversationParam({required this.title});
 
   Map<String, dynamic> toJson() => {
         'title': title,

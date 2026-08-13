@@ -3,14 +3,14 @@ import 'package:dartz/dartz.dart';
 import '../../../../core/data/exception/failure.dart';
 import '../../../../core/data/usecase/usecase.dart';
 import '../../data/model/logout_model.dart';
-import '../repository/profile_repository.dart';
+import '../repository/auth_repository.dart';
 
 /// Use case: logout current user.
 class LogoutUseCase extends UseCase<LogoutModel, NoParams> {
-  final ProfileRepository _repository;
+  final AuthRepository _repository;
 
-  LogoutUseCase({required ProfileRepository repository})
-    : _repository = repository;
+  LogoutUseCase({required AuthRepository repository})
+      : _repository = repository;
 
   @override
   Future<Either<Failure, LogoutModel>> call(NoParams params) {

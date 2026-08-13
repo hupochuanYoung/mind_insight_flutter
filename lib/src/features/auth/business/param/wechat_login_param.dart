@@ -1,7 +1,7 @@
-class WechatLoginRequest {
+class WechatLoginParam {
   final String code;
 
-  const WechatLoginRequest({required this.code});
+  const WechatLoginParam({required this.code});
 
   Map<String, dynamic> toJson() => {
         'code': code,

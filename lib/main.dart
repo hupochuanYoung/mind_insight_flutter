@@ -7,6 +7,7 @@ import 'package:mind_insight/src/core/theme/light_theme.dart';
 import 'package:mind_insight/src/core/theme/dark_theme.dart';
 import 'package:provider/provider.dart';
 
+import 'src/features/auth/presentation/provider/auth_provider.dart';
 import 'src/features/chat/presentation/provider/chat_provider.dart';
 import 'src/features/profile/presentation/provider/profile_provider.dart';
 
@@ -28,6 +29,7 @@ class MindInsightApp extends StatelessWidget {
 
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider<AuthProvider>(create: (_) => sl<AuthProvider>()),
         ChangeNotifierProvider<ChatProvider>(create: (_) => sl<ChatProvider>()),
         ChangeNotifierProvider<ProfileProvider>(
           create: (_) => sl<ProfileProvider>(),

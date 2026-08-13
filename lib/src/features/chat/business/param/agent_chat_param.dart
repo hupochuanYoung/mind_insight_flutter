@@ -1,10 +1,10 @@
-class AgentChatRequest {
+class AgentChatParam {
   final int? conversationId;
   final String? agentType;
   final String? title;
   final String message;
 
-  const AgentChatRequest({
+  const AgentChatParam({
     this.conversationId,
     this.agentType,
     this.title,
