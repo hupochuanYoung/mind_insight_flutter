@@ -30,6 +30,7 @@ import 'src/features/chat/presentation/provider/chat_provider.dart';
 // Profile feature
 import 'src/features/profile/business/repository/profile_repository.dart';
 import 'src/features/profile/business/usecase/get_profile_usecase.dart';
+import 'src/features/profile/business/usecase/update_profile_usecase.dart';
 import 'src/features/profile/data/datasource/profile_local_datasource.dart';
 import 'src/features/profile/data/datasource/profile_remote_datasource.dart';
 import 'src/features/profile/data/repository/profile_repository_impl.dart';
@@ -174,7 +175,14 @@ Future<void> initDependencies() async {
     () => GetProfileUseCase(repository: sl<ProfileRepository>()),
   );
 
+  sl.registerLazySingleton<UpdateProfileUseCase>(
+    () => UpdateProfileUseCase(repository: sl<ProfileRepository>()),
+  );
+
   sl.registerFactory<ProfileProvider>(
-    () => ProfileProvider(getProfileUseCase: sl<GetProfileUseCase>()),
+    () => ProfileProvider(
+      getProfileUseCase: sl<GetProfileUseCase>(),
+      updateProfileUseCase: sl<UpdateProfileUseCase>(),
+    ),
   );
 }

@@ -7,6 +7,9 @@ import 'package:mind_insight/src/features/auth/presentation/screen/login_screen.
 import 'package:mind_insight/src/features/chat/presentation/screen/chat_page.dart';
 import 'package:mind_insight/src/features/home/presentation/screen/home_page.dart';
 import 'package:mind_insight/src/features/home/presentation/screen/me_page.dart';
+import 'package:mind_insight/src/features/profile/presentation/screen/edit_profile_screen.dart';
+import 'package:mind_insight/src/features/profile/presentation/screen/chat_history_screen.dart';
+import 'package:mind_insight/src/features/profile/presentation/screen/settings_screen.dart';
 
 // =============================================================================
 // Route URI constants
@@ -25,6 +28,9 @@ class RouteUri {
 
   // Non-tab routes (add as features grow)
   static const String chatSession = '/chat-session';
+  static const String editProfile = '/edit-profile';
+  static const String chatHistory = '/chat-history';
+  static const String settings = '/settings';
   static const String error = '/error';
 }
 
@@ -205,6 +211,21 @@ GoRouter appRouter(GlobalKey<NavigatorState> navigatorKey) {
             child: ChatPage(entryType: type),
           );
         },
+      ),
+      GoRoute(
+        path: RouteUri.editProfile,
+        pageBuilder: (context, state) =>
+            slideTransitionPage(state: state, child: const EditProfileScreen()),
+      ),
+      GoRoute(
+        path: RouteUri.chatHistory,
+        pageBuilder: (context, state) =>
+            slideTransitionPage(state: state, child: const ChatHistoryScreen()),
+      ),
+      GoRoute(
+        path: RouteUri.settings,
+        pageBuilder: (context, state) =>
+            slideTransitionPage(state: state, child: const SettingsScreen()),
       ),
     ],
   );
