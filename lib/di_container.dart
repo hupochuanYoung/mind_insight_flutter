@@ -1,4 +1,5 @@
 import 'package:get_it/get_it.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'src/core/constant/app_constants.dart';
 import 'src/core/data/dio/dio_client.dart';
@@ -9,6 +10,7 @@ import 'src/features/auth/business/repository/auth_repository.dart';
 import 'src/features/auth/business/usecase/login_usecase.dart';
 import 'src/features/auth/business/usecase/logout_usecase.dart';
 import 'src/features/auth/business/usecase/register_usecase.dart';
+import 'src/features/auth/data/datasource/auth_local_datasource.dart';
 import 'src/features/auth/data/datasource/auth_remote_datasource.dart';
 import 'src/features/auth/data/repository/auth_repository_impl.dart';
 import 'src/features/auth/presentation/provider/auth_provider.dart';
@@ -28,6 +30,7 @@ import 'src/features/chat/presentation/provider/chat_provider.dart';
 // Profile feature
 import 'src/features/profile/business/repository/profile_repository.dart';
 import 'src/features/profile/business/usecase/get_profile_usecase.dart';
+import 'src/features/profile/data/datasource/profile_local_datasource.dart';
 import 'src/features/profile/data/datasource/profile_remote_datasource.dart';
 import 'src/features/profile/data/repository/profile_repository_impl.dart';
 import 'src/features/profile/presentation/provider/profile_provider.dart';
@@ -40,6 +43,9 @@ Future<void> initDependencies() async {
   // ---------------------------------------------------------------------------
   // Core
   // ---------------------------------------------------------------------------
+
+  final sharedPreferences = await SharedPreferences.getInstance();
+  sl.registerLazySingleton<SharedPreferences>(() => sharedPreferences);
 
   sl.registerLazySingleton<LoggingInterceptor>(() => LoggingInterceptor());
 
@@ -54,12 +60,20 @@ Future<void> initDependencies() async {
   // Auth Feature
   // ---------------------------------------------------------------------------
 
+  sl.registerLazySingleton<AuthLocalDatasource>(
+    () => AuthLocalDatasource(prefs: sl<SharedPreferences>()),
+  );
+
   sl.registerLazySingleton<AuthRemoteDatasource>(
     () => AuthRemoteDatasource(dioClient: sl<DioClient>()),
   );
 
   sl.registerLazySingleton<AuthRepository>(
-    () => AuthRepositoryImpl(authRemote: sl<AuthRemoteDatasource>()),
+    () => AuthRepositoryImpl(
+      authRemote: sl<AuthRemoteDatasource>(),
+      authLocal: sl<AuthLocalDatasource>(),
+      dioClient: sl<DioClient>(),
+    ),
   );
 
   sl.registerLazySingleton<LoginUseCase>(
@@ -81,6 +95,12 @@ Future<void> initDependencies() async {
       registerUseCase: sl<RegisterUseCase>(),
     ),
   );
+
+  // Restore cached token into DioClient on app startup.
+  final cachedToken = sl<AuthLocalDatasource>().getToken();
+  if (cachedToken != null && cachedToken.isNotEmpty) {
+    sl<DioClient>().updateToken(cachedToken);
+  }
 
   // ---------------------------------------------------------------------------
   // Chat Feature
@@ -139,8 +159,15 @@ Future<void> initDependencies() async {
     () => ProfileRemoteDatasource(dioClient: sl<DioClient>()),
   );
 
+  sl.registerLazySingleton<ProfileLocalDatasource>(
+    () => ProfileLocalDatasource(prefs: sl<SharedPreferences>()),
+  );
+
   sl.registerLazySingleton<ProfileRepository>(
-    () => ProfileRepositoryImpl(profileRemote: sl<ProfileRemoteDatasource>()),
+    () => ProfileRepositoryImpl(
+      profileRemote: sl<ProfileRemoteDatasource>(),
+      profileLocal: sl<ProfileLocalDatasource>(),
+    ),
   );
 
   sl.registerLazySingleton<GetProfileUseCase>(

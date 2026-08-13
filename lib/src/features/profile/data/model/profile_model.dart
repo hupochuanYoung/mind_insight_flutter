@@ -25,10 +25,21 @@ class ProfileModel {
       avatar: json['avatar'] as String?,
       gender: json['gender'] as int? ?? 0,
       status: json['status'] as int? ?? 0,
-      loginTypes: (json['loginTypes'] as List<dynamic>?)
+      loginTypes:
+          (json['loginTypes'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
           [],
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'userId': userId,
+    'userNo': userNo,
+    if (nickname != null) 'nickname': nickname,
+    if (avatar != null) 'avatar': avatar,
+    'gender': gender,
+    'status': status,
+    'loginTypes': loginTypes,
+  };
 }
