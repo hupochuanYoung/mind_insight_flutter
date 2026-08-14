@@ -143,6 +143,37 @@ class DioClient {
   }
 
   // ---------------------------------------------------------------------------
+  // PATCH
+  // ---------------------------------------------------------------------------
+  Future<Response> patch(
+    String uri, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    CancelToken? cancelToken,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+    Options? options,
+  }) async {
+    try {
+      debugPrint('apiCall PATCH ==> $uri | data: $data');
+      final response = await dio.patch(
+        uri,
+        data: data,
+        queryParameters: queryParameters,
+        cancelToken: cancelToken,
+        onSendProgress: onSendProgress,
+        onReceiveProgress: onReceiveProgress,
+        options: options,
+      );
+      return response;
+    } on FormatException catch (_) {
+      throw const FormatException('Unable to process the data');
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // DELETE
   // ---------------------------------------------------------------------------
   Future<Response> delete(

@@ -8,7 +8,6 @@ import '../../../../core/data/exception/failure.dart';
 import '../../business/param/create_conversation_param.dart';
 import '../../business/param/create_message_param.dart';
 import '../../business/param/update_conversation_param.dart';
-import '../model/conversation_event_model.dart';
 import '../model/conversation_message_model.dart';
 import '../model/conversation_model.dart';
 import '../model/conversation_reply_model.dart';
@@ -73,7 +72,7 @@ class ConversationRemoteDatasource {
           ),
         );
       }
-      final list = (body['data'] as List<dynamic>)
+      final list = (body['data']['list'] as List<dynamic>)
           .map((e) => ConversationModel.fromJson(e as Map<String, dynamic>))
           .toList();
       return right(list);
@@ -122,7 +121,7 @@ class ConversationRemoteDatasource {
     UpdateConversationParam param,
   ) async {
     try {
-      final response = await _dioClient.put(
+      final response = await _dioClient.patch(
         AppConstants.conversationUri(id),
         data: param.toJson(),
       );
@@ -236,41 +235,6 @@ class ConversationRemoteDatasource {
       final list = (body['data'] as List<dynamic>)
           .map(
             (e) => ConversationMessageModel.fromJson(e as Map<String, dynamic>),
-          )
-          .toList();
-      return right(list);
-    } on DioException catch (e) {
-      return left(
-        ConnectionFailure(errorMessage: ApiErrorHandler.getMessage(e)),
-      );
-    } catch (e) {
-      return left(
-        ServerFailure(errorMessage: e.toString(), errorCode: 'UNKNOWN'),
-      );
-    }
-  }
-
-  /// GET /api/conversations/{id}/events
-  Future<Either<Failure, List<ConversationEventModel>>> listEvents(
-    int id,
-  ) async {
-    try {
-      final response = await _dioClient.get(
-        AppConstants.conversationEventsUri(id),
-      );
-      final body = response.data as Map<String, dynamic>;
-      final code = body['code'] as int? ?? -1;
-      if (code != 0) {
-        return left(
-          ServerFailure(
-            errorMessage: body['message'] as String? ?? 'Unknown error',
-            errorCode: code.toString(),
-          ),
-        );
-      }
-      final list = (body['data'] as List<dynamic>)
-          .map(
-            (e) => ConversationEventModel.fromJson(e as Map<String, dynamic>),
           )
           .toList();
       return right(list);

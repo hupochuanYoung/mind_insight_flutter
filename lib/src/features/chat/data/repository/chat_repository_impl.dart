@@ -12,7 +12,6 @@ import '../datasource/agent_remote_datasource.dart';
 import '../datasource/conversation_remote_datasource.dart';
 import '../datasource/tarot_remote_datasource.dart';
 import '../model/agent_chat_model.dart';
-import '../model/conversation_event_model.dart';
 import '../model/conversation_message_model.dart';
 import '../model/conversation_model.dart';
 import '../model/conversation_reply_model.dart';
@@ -91,10 +90,6 @@ class ChatRepositoryImpl implements ChatRepository {
     pageNumber: pageNumber,
     pageSize: pageSize,
   );
-
-  @override
-  Future<Either<Failure, List<ConversationEventModel>>> listEvents(int id) =>
-      _conversationRemote.listEvents(id);
 
   // ---------------------------------------------------------------------------
   // Tarot

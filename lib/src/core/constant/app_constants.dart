@@ -80,10 +80,6 @@ class AppConstants {
   static String conversationMessagesUri(int id) =>
       '/api/conversations/$id/messages';
 
-  /// GET /api/conversations/{id}/events
-  static String conversationEventsUri(int id) =>
-      '/api/conversations/$id/events';
-
   // ---------------------------------------------------------------------------
   // Agent
   // ---------------------------------------------------------------------------

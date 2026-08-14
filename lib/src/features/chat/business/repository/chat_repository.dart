@@ -2,7 +2,6 @@ import 'package:dartz/dartz.dart';
 
 import '../../../../core/data/exception/failure.dart';
 import '../../data/model/agent_chat_model.dart';
-import '../../data/model/conversation_event_model.dart';
 import '../../data/model/conversation_message_model.dart';
 import '../../data/model/conversation_model.dart';
 import '../../data/model/conversation_reply_model.dart';
@@ -58,8 +57,6 @@ abstract class ChatRepository {
     int pageNumber = 1,
     int pageSize = 20,
   });
-
-  Future<Either<Failure, List<ConversationEventModel>>> listEvents(int id);
 
   // ---------------------------------------------------------------------------
   // Tarot

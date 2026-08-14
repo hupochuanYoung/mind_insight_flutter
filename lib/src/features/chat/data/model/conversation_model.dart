@@ -1,30 +1,28 @@
 class ConversationModel {
   final int id;
-  final String conversationNo;
+  final String conversationId;
   final String type;
   final String title;
   final String status;
   final String? lastMessagePreview;
   final DateTime? createdAt;
   final DateTime? updatedAt;
-  final Map<String, dynamic>? rawProviderData;
 
   const ConversationModel({
     required this.id,
-    required this.conversationNo,
+    required this.conversationId,
     required this.type,
     required this.title,
     required this.status,
     this.lastMessagePreview,
     this.createdAt,
     this.updatedAt,
-    this.rawProviderData,
   });
 
   factory ConversationModel.fromJson(Map<String, dynamic> json) {
     return ConversationModel(
       id: json['id'] as int? ?? 0,
-      conversationNo: json['conversationNo'] as String? ?? '',
+      conversationId: json['conversationId'] as String? ?? '',
       type: json['type'] as String? ?? '',
       title: json['title'] as String? ?? '',
       status: json['status'] as String? ?? '',
@@ -35,7 +33,6 @@ class ConversationModel {
       updatedAt: json['updatedAt'] != null
           ? DateTime.tryParse(json['updatedAt'] as String)
           : null,
-      rawProviderData: json['rawProviderData'] as Map<String, dynamic>?,
     );
   }
 }
