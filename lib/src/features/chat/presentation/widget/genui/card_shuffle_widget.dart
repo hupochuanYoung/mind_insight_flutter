@@ -28,7 +28,7 @@ class CardShuffleWidget extends StatefulWidget {
 
 class _CardShuffleWidgetState extends State<CardShuffleWidget>
     with SingleTickerProviderStateMixin {
-  static const int _totalCards = 22;
+  static const int _totalCards = 78;
   static const double _cardWidth = 52.0;
   static const double _cardHeight = 82.0;
 

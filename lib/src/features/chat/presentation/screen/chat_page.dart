@@ -45,6 +45,7 @@ class ChatPage extends StatefulWidget {
 class _ChatPageState extends State<ChatPage> {
   static const String _currentUserId = 'user';
   static const String _assistantUserId = 'mind-insight';
+  static const String _typingMessageId = '_typing_indicator_';
 
   late final InMemoryChatController _chatController;
   late final ChatProvider _chatProvider;
@@ -349,6 +350,7 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> _sendToAgent(String message) async {
     setState(() => _isLoading = true);
+    _showTypingIndicator();
 
     // Pass entryType only on the first message (when no conversation exists yet)
     final isFirstMessage = _chatProvider.currentConversationId == null;
@@ -359,6 +361,8 @@ class _ChatPageState extends State<ChatPage> {
     );
 
     if (!mounted) return;
+
+    _hideTypingIndicator();
 
     if (_chatProvider.errorMessage != null) {
       _insertAssistantText('⚠️ ${_chatProvider.errorMessage}');
@@ -575,6 +579,32 @@ class _ChatPageState extends State<ChatPage> {
   // Message insertion helpers
   // ===========================================================================
 
+  void _showTypingIndicator() {
+    _chatController.insertMessage(
+      Message.custom(
+        id: _typingMessageId,
+        authorId: _assistantUserId,
+        createdAt: DateTime.now(),
+        metadata: {'ui_view': '_typing'},
+      ),
+    );
+  }
+
+  void _hideTypingIndicator() {
+    try {
+      _chatController.removeMessage(
+        Message.custom(
+          id: _typingMessageId,
+          authorId: _assistantUserId,
+          createdAt: DateTime.now(),
+          metadata: {},
+        ),
+      );
+    } catch (_) {
+      // Already removed or not present
+    }
+  }
+
   void _insertAssistantText(String text, {DateTime? at}) {
     _chatController.insertMessage(
       Message.text(
@@ -609,10 +639,37 @@ class _ChatPageState extends State<ChatPage> {
     MessageGroupStatus? groupStatus,
   }) {
     final metadata = message.metadata ?? {};
+    final uiView = metadata['ui_view'] as String? ?? '';
+
+    // Typing indicator
+    if (uiView == '_typing') {
+      return _buildTypingBubble();
+    }
+
     final readOnly = metadata['_readOnly'] == true;
     return GenUiRegistry.build(
       data: metadata,
       onAction: readOnly ? _noOpAction : _handleGenUiAction,
+    );
+  }
+
+  Widget _buildTypingBubble() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: ColorResources.border),
+        ),
+        child: const IsTypingIndicator(
+          size: 8,
+          spacing: 4,
+          color: ColorResources.muted,
+        ),
+      ),
     );
   }
 
