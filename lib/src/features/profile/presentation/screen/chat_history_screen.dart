@@ -180,7 +180,12 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
   }
 
   void _openConversation(ConversationModel conversation) {
-    context.push('${RouteUri.chatSession}?type=${conversation.type}');
+    final title = Uri.encodeComponent(
+      conversation.title.isNotEmpty ? conversation.title : '塔罗对话',
+    );
+    context.push(
+      '${RouteUri.chatSession}?conversationId=${conversation.id}&title=$title',
+    );
   }
 }
 

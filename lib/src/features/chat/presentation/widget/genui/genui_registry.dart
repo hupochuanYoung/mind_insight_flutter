@@ -7,8 +7,8 @@ import 'interpretation_widget.dart';
 import 'plain_message_widget.dart';
 
 /// Callback type for GenUI action buttons.
-typedef GenUiActionCallback = void Function(
-    String action, Map<String, dynamic> data);
+typedef GenUiActionCallback =
+    void Function(String action, Map<String, dynamic> data);
 
 /// Registry that maps `ui_view` values from the agent response to Flutter widgets.
 ///
@@ -23,29 +23,39 @@ class GenUiRegistry {
   /// `stage`, `ui_view`, `message`, `data`, `actions`, etc.
   ///
   /// [onAction] is called when user taps an action button (e.g. "start_draw").
+  /// When `data['_readOnly']` is true, action buttons are suppressed.
   static Widget build({
     required Map<String, dynamic> data,
     required GenUiActionCallback onAction,
   }) {
     final uiView = data['ui_view'] as String? ?? '';
+    final readOnly = data['_readOnly'] == true;
+
+    // Strip actions for read-only historical messages so buttons don't render
+    final effectiveData = readOnly
+        ? (Map<String, dynamic>.from(data)..['actions'] = <dynamic>[])
+        : data;
 
     return switch (uiView) {
-      'plain_message' => PlainMessageWidget(data: data),
-      'clarify_question' => PlainMessageWidget(data: data),
+      'plain_message' => PlainMessageWidget(data: effectiveData),
+      'clarify_question' => PlainMessageWidget(data: effectiveData),
       'draw_invitation' => DrawInvitationWidget(
-          data: data,
-          onAction: onAction,
-        ),
+        data: effectiveData,
+        onAction: onAction,
+      ),
       'card_shuffle' => CardShuffleWidget(
-          data: data,
-          onAction: onAction,
-        ),
-      'card_reveal' => CardRevealWidget(data: data, onAction: onAction),
+        data: effectiveData,
+        onAction: onAction,
+      ),
+      'card_reveal' => CardRevealWidget(
+        data: effectiveData,
+        onAction: onAction,
+      ),
       'interpretation' => InterpretationWidget(
-          data: data,
-          onAction: onAction,
-        ),
-      _ => PlainMessageWidget(data: data),
+        data: effectiveData,
+        onAction: onAction,
+      ),
+      _ => PlainMessageWidget(data: effectiveData),
     };
   }
 }

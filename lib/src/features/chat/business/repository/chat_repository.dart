@@ -2,7 +2,7 @@ import 'package:dartz/dartz.dart';
 
 import '../../../../core/data/exception/failure.dart';
 import '../../data/model/agent_chat_model.dart';
-import '../../data/model/conversation_message_model.dart';
+import '../../data/model/conversation_message_list_model.dart';
 import '../../data/model/conversation_model.dart';
 import '../../data/model/conversation_reply_model.dart';
 import '../../data/model/tarot_reveal_model.dart';
@@ -52,10 +52,10 @@ abstract class ChatRepository {
     CreateMessageParam param,
   );
 
-  Future<Either<Failure, List<ConversationMessageModel>>> listMessages(
+  Future<Either<Failure, ConversationMessageListModel>> listMessages(
     int id, {
-    int pageNumber = 1,
-    int pageSize = 20,
+    int pageSize = 50,
+    String? recordId,
   });
 
   // ---------------------------------------------------------------------------

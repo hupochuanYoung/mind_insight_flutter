@@ -205,10 +205,21 @@ GoRouter appRouter(GlobalKey<NavigatorState> navigatorKey) {
       GoRoute(
         path: RouteUri.chatSession,
         pageBuilder: (context, state) {
-          final type = state.uri.queryParameters['type'] ?? 'daily_fortune';
+          final type = state.uri.queryParameters['type'];
+          final conversationIdStr = state.uri.queryParameters['conversationId'];
+          final title = state.uri.queryParameters['title'];
+          final conversationId = conversationIdStr != null
+              ? int.tryParse(conversationIdStr)
+              : null;
           return slideTransitionPage(
             state: state,
-            child: ChatPage(entryType: type),
+            child: ChatPage(
+              entryType: conversationId == null
+                  ? (type ?? 'daily_fortune')
+                  : null,
+              conversationId: conversationId,
+              conversationTitle: title,
+            ),
           );
         },
       ),

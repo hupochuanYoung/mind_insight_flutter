@@ -8,7 +8,7 @@ import '../../../../core/data/exception/failure.dart';
 import '../../business/param/create_conversation_param.dart';
 import '../../business/param/create_message_param.dart';
 import '../../business/param/update_conversation_param.dart';
-import '../model/conversation_message_model.dart';
+import '../model/conversation_message_list_model.dart';
 import '../model/conversation_model.dart';
 import '../model/conversation_reply_model.dart';
 
@@ -212,15 +212,19 @@ class ConversationRemoteDatasource {
   }
 
   /// GET /api/conversations/{id}/messages
-  Future<Either<Failure, List<ConversationMessageModel>>> listMessages(
+  Future<Either<Failure, ConversationMessageListModel>> listMessages(
     int id, {
-    int pageNumber = 1,
-    int pageSize = 20,
+    int pageSize = 50,
+    String? recordId,
   }) async {
     try {
+      final queryParams = <String, dynamic>{'pageSize': pageSize};
+      if (recordId != null && recordId.isNotEmpty) {
+        queryParams['recordId'] = recordId;
+      }
       final response = await _dioClient.get(
         AppConstants.conversationMessagesUri(id),
-        queryParameters: {'pageNumber': pageNumber, 'pageSize': pageSize},
+        queryParameters: queryParams,
       );
       final body = response.data as Map<String, dynamic>;
       final code = body['code'] as int? ?? -1;
@@ -232,12 +236,11 @@ class ConversationRemoteDatasource {
           ),
         );
       }
-      final list = (body['data'] as List<dynamic>)
-          .map(
-            (e) => ConversationMessageModel.fromJson(e as Map<String, dynamic>),
-          )
-          .toList();
-      return right(list);
+      return right(
+        ConversationMessageListModel.fromJson(
+          body['data'] as Map<String, dynamic>,
+        ),
+      );
     } on DioException catch (e) {
       return left(
         ConnectionFailure(errorMessage: ApiErrorHandler.getMessage(e)),

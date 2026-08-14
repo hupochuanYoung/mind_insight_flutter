@@ -12,7 +12,7 @@ import '../datasource/agent_remote_datasource.dart';
 import '../datasource/conversation_remote_datasource.dart';
 import '../datasource/tarot_remote_datasource.dart';
 import '../model/agent_chat_model.dart';
-import '../model/conversation_message_model.dart';
+import '../model/conversation_message_list_model.dart';
 import '../model/conversation_model.dart';
 import '../model/conversation_reply_model.dart';
 import '../model/tarot_reveal_model.dart';
@@ -81,14 +81,14 @@ class ChatRepositoryImpl implements ChatRepository {
   ) => _conversationRemote.respond(id, param);
 
   @override
-  Future<Either<Failure, List<ConversationMessageModel>>> listMessages(
+  Future<Either<Failure, ConversationMessageListModel>> listMessages(
     int id, {
-    int pageNumber = 1,
-    int pageSize = 20,
+    int pageSize = 50,
+    String? recordId,
   }) => _conversationRemote.listMessages(
     id,
-    pageNumber: pageNumber,
     pageSize: pageSize,
+    recordId: recordId,
   );
 
   // ---------------------------------------------------------------------------

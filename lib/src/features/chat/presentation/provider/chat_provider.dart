@@ -61,6 +61,7 @@ class ChatProvider extends ChangeNotifier {
     required String message,
     String? agentType,
     String? title,
+    String? entryType,
   }) async {
     _isLoading = true;
     _errorMessage = null;
@@ -70,6 +71,7 @@ class ChatProvider extends ChangeNotifier {
       conversationId: _currentConversationId,
       agentType: agentType,
       title: title,
+      entryType: entryType,
       message: message,
     );
 
@@ -169,6 +171,11 @@ class ChatProvider extends ChangeNotifier {
   // ---------------------------------------------------------------------------
   // Lifecycle
   // ---------------------------------------------------------------------------
+
+  /// Set the conversation ID (e.g. when resuming an existing conversation).
+  void setConversationId(int id) {
+    _currentConversationId = id;
+  }
 
   /// Start a new conversation (clears all state).
   void resetConversation() {

@@ -8,17 +8,35 @@ import 'package:mind_insight/src/core/component/components.dart';
 import 'package:mind_insight/src/core/constant/app_color_resources.dart';
 import 'package:mind_insight/src/core/constant/app_text_styles.dart';
 import 'package:mind_insight/src/features/chat/business/param/create_tarot_draw_param.dart';
+import 'package:mind_insight/src/features/chat/data/datasource/conversation_remote_datasource.dart';
+import 'package:mind_insight/src/features/chat/data/model/conversation_message_model.dart';
 import 'package:mind_insight/src/features/chat/presentation/provider/chat_provider.dart';
 import 'package:mind_insight/src/features/chat/presentation/widget/genui/genui_registry.dart';
 
 /// Chat page that uses [ChatProvider] for all API interactions and renders
 /// dynamic GenUI widgets based on the agent's structured JSON responses.
+///
+/// Supports two entry modes:
+/// - New conversation: pass [entryType] to start a fresh chat.
+/// - Existing conversation: pass [conversationId] to load history and continue.
 class ChatPage extends StatefulWidget {
-  const ChatPage({super.key, this.entryType});
+  const ChatPage({
+    super.key,
+    this.entryType,
+    this.conversationId,
+    this.conversationTitle,
+  });
 
   /// Entry type from the home page (e.g. 'daily_fortune', 'worry', etc.).
   /// Maps to the agent's `entry` context parameter.
   final String? entryType;
+
+  /// If non-null, the page loads historical messages for this conversation
+  /// and allows the user to continue chatting.
+  final int? conversationId;
+
+  /// Optional title for an existing conversation (shown in app bar).
+  final String? conversationTitle;
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -33,22 +51,35 @@ class _ChatPageState extends State<ChatPage> {
 
   int _messageSequence = 0;
   bool _isLoading = false;
+  bool _isLoadingHistory = false;
 
   /// The last structured agent data — available for future follow-up actions.
   // ignore: unused_field
   Map<String, dynamic>? _lastAgentData;
 
+  /// Whether we are resuming an existing conversation (history loaded).
+  bool get _isExistingConversation => widget.conversationId != null;
+
   @override
   void initState() {
     super.initState();
     _chatProvider = sl<ChatProvider>();
-    _chatController = InMemoryChatController(messages: _initialMessages());
 
-    // If entry type is provided, auto-send the initial message to the agent
-    if (widget.entryType != null) {
+    if (_isExistingConversation) {
+      // Resuming existing conversation — start with empty list, load history
+      _chatController = InMemoryChatController(messages: []);
+      _chatProvider.setConversationId(widget.conversationId!);
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _sendInitialMessage();
+        _loadHistoryMessages();
       });
+    } else {
+      // New conversation — show greeting and optionally auto-send
+      _chatController = InMemoryChatController(messages: _initialMessages());
+      if (widget.entryType != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _sendInitialMessage();
+        });
+      }
     }
   }
 
@@ -64,15 +95,17 @@ class _ChatPageState extends State<ChatPage> {
       backgroundColor: ColorResources.surface,
       appBar: _buildAppBar(),
       body: SafeArea(
-        child: Chat(
-          currentUserId: _currentUserId,
-          resolveUser: _resolveUser,
-          chatController: _chatController,
-          onMessageSend: _handleMessageSend,
-          backgroundColor: ColorResources.surface,
-          theme: _chatTheme(context),
-          builders: Builders(customMessageBuilder: _buildCustomMessage),
-        ),
+        child: _isLoadingHistory
+            ? const Center(child: CircularProgressIndicator())
+            : Chat(
+                currentUserId: _currentUserId,
+                resolveUser: _resolveUser,
+                chatController: _chatController,
+                onMessageSend: _handleMessageSend,
+                backgroundColor: ColorResources.surface,
+                theme: _chatTheme(context),
+                builders: Builders(customMessageBuilder: _buildCustomMessage),
+              ),
       ),
     );
   }
@@ -82,7 +115,7 @@ class _ChatPageState extends State<ChatPage> {
   // ===========================================================================
 
   PreferredSizeWidget _buildAppBar() {
-    final title = _entryTitle(widget.entryType);
+    final title = widget.conversationTitle ?? _entryTitle(widget.entryType);
     return AppBar(
       backgroundColor: ColorResources.surface,
       surfaceTintColor: Colors.transparent,
@@ -169,6 +202,126 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   // ===========================================================================
+  // History loading — for existing conversations
+  // ===========================================================================
+
+  Future<void> _loadHistoryMessages() async {
+    setState(() => _isLoadingHistory = true);
+
+    final datasource = sl<ConversationRemoteDatasource>();
+    final result = await datasource.listMessages(widget.conversationId!);
+
+    if (!mounted) return;
+
+    result.fold(
+      (failure) {
+        _insertAssistantText('⚠️ 无法加载历史消息');
+      },
+      (data) {
+        final messages = data.messages;
+        for (int i = 0; i < messages.length; i++) {
+          final msg = messages[i];
+          final isLast = i == messages.length - 1;
+          _renderHistoryMessage(
+            msg,
+            isLastAssistant: isLast && msg.role == 'assistant',
+          );
+        }
+      },
+    );
+
+    setState(() => _isLoadingHistory = false);
+  }
+
+  /// Render a single historical message using the same GenUI logic.
+  void _renderHistoryMessage(
+    ConversationMessageModel msg, {
+    bool isLastAssistant = false,
+  }) {
+    final time = msg.dateTime ?? DateTime.now();
+
+    if (msg.role == 'user') {
+      // User messages: only show if it's plain human text (skip system JSON payloads)
+      final content = msg.content;
+      if (content.isEmpty) return;
+      // Skip internal JSON events sent as user messages (e.g. tarot_cards_revealed)
+      if (_isInternalEvent(content)) return;
+      _chatController.insertMessage(
+        Message.text(
+          id: _nextMessageId(),
+          authorId: _currentUserId,
+          createdAt: time,
+          sentAt: time,
+          text: content,
+        ),
+      );
+    } else {
+      // Assistant messages: parse content same as live responses
+      _renderAssistantContent(
+        msg.content,
+        at: time,
+        interactive: isLastAssistant,
+      );
+    }
+  }
+
+  /// Check if a user message content is an internal system event (JSON payload
+  /// sent to the agent, not something the user typed).
+  bool _isInternalEvent(String content) {
+    if (!content.trimLeft().startsWith('{')) return false;
+    try {
+      final parsed = jsonDecode(content) as Map<String, dynamic>;
+      return parsed.containsKey('event') || parsed.containsKey('instruction');
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Unified rendering for assistant content (used by both history and live).
+  void _renderAssistantContent(
+    String content, {
+    DateTime? at,
+    bool interactive = true,
+  }) {
+    if (content.isEmpty) return;
+    final time = at ?? DateTime.now();
+
+    final cleaned = _stripMarkdownCodeBlock(content);
+    Map<String, dynamic>? parsedData;
+    try {
+      parsedData = jsonDecode(cleaned) as Map<String, dynamic>;
+    } catch (_) {
+      // Plain text
+      _insertAssistantText(content, at: time);
+      return;
+    }
+
+    if (parsedData['type'] == 'tarot_ui') {
+      if (interactive) _lastAgentData = parsedData;
+      final uiView = parsedData['ui_view'] as String? ?? '';
+
+      if (uiView == 'plain_message' || uiView == 'clarify_question') {
+        final msg = parsedData['message'] as String? ?? '';
+        if (msg.isNotEmpty) {
+          _insertAssistantText(msg, at: time);
+        }
+      } else {
+        // For history messages that are not the last, mark as read-only
+        if (!interactive) {
+          parsedData = Map<String, dynamic>.from(parsedData);
+          parsedData['_readOnly'] = true;
+        }
+        _insertGenUiMessage(parsedData, at: time);
+      }
+    } else {
+      final msg = parsedData['message'] as String?;
+      if (msg != null && msg.isNotEmpty) {
+        _insertAssistantText(msg, at: time);
+      }
+    }
+  }
+
+  // ===========================================================================
   // User actions
   // ===========================================================================
 
@@ -197,7 +350,13 @@ class _ChatPageState extends State<ChatPage> {
   Future<void> _sendToAgent(String message) async {
     setState(() => _isLoading = true);
 
-    await _chatProvider.sendMessage(message: message, agentType: 'tarot');
+    // Pass entryType only on the first message (when no conversation exists yet)
+    final isFirstMessage = _chatProvider.currentConversationId == null;
+    await _chatProvider.sendMessage(
+      message: message,
+      agentType: 'tarot',
+      entryType: isFirstMessage ? widget.entryType : null,
+    );
 
     if (!mounted) return;
 
@@ -450,7 +609,16 @@ class _ChatPageState extends State<ChatPage> {
     MessageGroupStatus? groupStatus,
   }) {
     final metadata = message.metadata ?? {};
-    return GenUiRegistry.build(data: metadata, onAction: _handleGenUiAction);
+    final readOnly = metadata['_readOnly'] == true;
+    return GenUiRegistry.build(
+      data: metadata,
+      onAction: readOnly ? _noOpAction : _handleGenUiAction,
+    );
+  }
+
+  /// No-op action callback for read-only historical messages.
+  void _noOpAction(String action, Map<String, dynamic> data) {
+    // Historical messages — actions are disabled.
   }
 
   // ===========================================================================
