@@ -7,7 +7,8 @@ import 'package:mind_insight/src/features/profile/presentation/provider/profile_
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 
-/// Main Profile / "Me" screen with modern card-based layout.
+/// Profile screen combining card-header (avatar + badge + stats),
+/// subscription banner, and clean menu list.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -19,7 +20,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    // Fetch profile on first load
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ProfileProvider>().fetchProfile();
     });
@@ -35,52 +35,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
           }
 
           return SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildProfileHeader(context, provider),
-                const SizedBox(height: 32),
-                _buildMenuSection(
-                  context,
-                  title: 'Account',
-                  items: [
-                    _MenuItem(
-                      icon: Icons.edit_outlined,
-                      iconColor: ColorResources.primary,
-                      title: 'Edit Profile',
-                      subtitle: 'Update your name and avatar',
-                      onTap: () => context.push(RouteUri.editProfile),
-                    ),
-                    _MenuItem(
-                      icon: Icons.history_rounded,
-                      iconColor: ColorResources.teal,
-                      title: 'Chat History',
-                      subtitle: 'View previous conversations',
-                      onTap: () => context.push(RouteUri.chatHistory),
-                    ),
-                  ],
-                ),
+                // Title row
+                _buildTopBar(context),
                 const SizedBox(height: 20),
-                _buildMenuSection(
-                  context,
-                  title: 'Preferences',
-                  items: [
-                    _MenuItem(
-                      icon: Icons.settings_outlined,
-                      iconColor: ColorResources.amber,
-                      title: 'Settings',
-                      subtitle: 'Theme, language, and more',
-                      onTap: () => context.push(RouteUri.settings),
-                    ),
-                    _MenuItem(
-                      icon: Icons.help_outline_rounded,
-                      iconColor: ColorResources.pink,
-                      title: 'About',
-                      subtitle: 'Version and credits',
-                      onTap: () => _showAboutSheet(context),
-                    ),
-                  ],
-                ),
+                // Profile card (avatar + name + stats)
+                _buildProfileCard(context, provider),
+                const SizedBox(height: 16),
+                // Subscription banner
+                _buildSubscriptionBanner(context),
+                const SizedBox(height: 28),
+                // Menu items
+                _buildMenuList(context),
               ],
             ),
           );
@@ -90,84 +59,199 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // Profile Header — Avatar + Name + ID
+  // Top Bar — "Profile" title + notification bell
   // ---------------------------------------------------------------------------
 
-  Widget _buildProfileHeader(BuildContext context, ProfileProvider provider) {
+  Widget _buildTopBar(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          'Profile',
+          style: textOverLarge.copyWith(
+            color: ColorResources.ink,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: ColorResources.card,
+            border: Border.all(color: ColorResources.border),
+          ),
+          child: Icon(
+            Icons.notifications_outlined,
+            color: ColorResources.ink,
+            size: 20,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Profile Card — Avatar ring + Name + Badge + Stats
+  // ---------------------------------------------------------------------------
+
+  Widget _buildProfileCard(BuildContext context, ProfileProvider provider) {
     final profile = provider.profile;
     final displayName = profile?.nickname ?? 'Traveler';
     final userNo = profile?.userNo ?? '';
     final avatarColor = ColorResources.getColorFromInitial(displayName);
 
-    return Column(
-      children: [
-        // Avatar
-        Container(
-          width: 88,
-          height: 88,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [avatarColor.withValues(alpha: 0.8), avatarColor],
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+      decoration: BoxDecoration(
+        color: ColorResources.card,
+        borderRadius: BorderRadius.circular(Dimensions.radiusExtraLarge),
+        border: Border.all(color: ColorResources.border),
+        boxShadow: [
+          BoxShadow(
+            color: ColorResources.ink.withValues(alpha: 0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Avatar with ring
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  ColorResources.primary.withValues(alpha: 0.6),
+                  ColorResources.primary,
+                  ColorResources.teal.withValues(alpha: 0.7),
+                ],
+              ),
             ),
-            boxShadow: [
-              BoxShadow(
-                color: avatarColor.withValues(alpha: 0.3),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
+            child: Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: avatarColor,
+                border: Border.all(color: Colors.white, width: 3),
+              ),
+              child: profile?.avatar != null && profile!.avatar!.isNotEmpty
+                  ? ClipOval(
+                      child: Image.network(
+                        profile.avatar!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, e, s) =>
+                            _buildAvatarInitial(displayName),
+                      ),
+                    )
+                  : _buildAvatarInitial(displayName),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Name + Premium badge row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(
+                child: Text(
+                  displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textExtraLarge.copyWith(color: ColorResources.ink),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Premium badge (placeholder — toggled by subscription state)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: ColorResources.ink,
+                  borderRadius: BorderRadius.circular(
+                    Dimensions.radiusCircular,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.workspace_premium,
+                      color: ColorResources.gold,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Free',
+                      style: textBoldSmall.copyWith(
+                        color: Colors.white,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
-          child: profile?.avatar != null && profile!.avatar!.isNotEmpty
-              ? ClipOval(
-                  child: Image.network(
-                    profile.avatar!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, e, s) => _buildAvatarInitial(displayName),
-                  ),
-                )
-              : _buildAvatarInitial(displayName),
-        ),
-        const SizedBox(height: 16),
-        // Name
-        Text(
-          displayName,
-          style: textOverLarge.copyWith(color: ColorResources.ink),
-        ),
-        const SizedBox(height: 4),
-        // User ID
-        if (userNo.isNotEmpty)
-          Text(
-            'ID: $userNo',
-            style: textSmall.copyWith(color: ColorResources.muted),
-          ),
-        const SizedBox(height: 16),
-        // Edit button chip
-        GestureDetector(
-          onTap: () => context.push(RouteUri.editProfile),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          const SizedBox(height: 4),
+
+          // User ID
+          if (userNo.isNotEmpty)
+            Text(
+              '@$userNo',
+              style: textSmall.copyWith(color: ColorResources.muted),
+            ),
+          const SizedBox(height: 18),
+
+          // Stats row
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 14),
             decoration: BoxDecoration(
-              color: ColorResources.primarySoft,
-              borderRadius: BorderRadius.circular(Dimensions.radiusCircular),
+              color: ColorResources.surface,
+              borderRadius: BorderRadius.circular(Dimensions.radiusMedium),
             ),
             child: Row(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                Icon(Icons.edit, size: 14, color: ColorResources.primary),
-                const SizedBox(width: 6),
-                Text(
-                  'Edit Profile',
-                  style: textBoldSmall.copyWith(color: ColorResources.primary),
-                ),
+                _buildStat('Readings', '—'),
+                _buildStatDivider(),
+                _buildStat('Streak', '0'),
+                _buildStatDivider(),
+                _buildStat('Days', '0'),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStat(String label, String value) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: textBoldLarge.copyWith(
+            color: ColorResources.ink,
+            fontSize: 18,
+          ),
         ),
+        const SizedBox(height: 2),
+        Text(label, style: textSmall.copyWith(color: ColorResources.muted)),
       ],
     );
+  }
+
+  Widget _buildStatDivider() {
+    return Container(width: 1, height: 28, color: ColorResources.border);
   }
 
   Widget _buildAvatarInitial(String name) {
@@ -176,7 +260,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Text(
         initial,
         style: const TextStyle(
-          fontSize: 36,
+          fontSize: 32,
           fontWeight: FontWeight.w700,
           color: Colors.white,
         ),
@@ -185,100 +269,155 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // Menu Section
+  // Subscription Banner
   // ---------------------------------------------------------------------------
 
-  Widget _buildMenuSection(
-    BuildContext context, {
-    required String title,
-    required List<_MenuItem> items,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 10),
-          child: Text(
-            title,
-            style: textBoldSmall.copyWith(
-              color: ColorResources.muted,
-              letterSpacing: 0.8,
+  Widget _buildSubscriptionBanner(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        // TODO: Navigate to subscription screen
+        // context.push(RouteUri.subscription);
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [
+              ColorResources.primary,
+              ColorResources.primary.withValues(alpha: 0.85),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+          boxShadow: [
+            BoxShadow(
+              color: ColorResources.primary.withValues(alpha: 0.25),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
-          ),
+          ],
         ),
-        Container(
-          decoration: BoxDecoration(
-            color: ColorResources.card,
-            borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
-            border: Border.all(color: ColorResources.border),
-          ),
-          child: Column(
-            children: List.generate(items.length, (index) {
-              final item = items[index];
-              final isLast = index == items.length - 1;
-              return _buildMenuTile(context, item, showDivider: !isLast);
-            }),
-          ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+              ),
+              child: const Icon(
+                Icons.auto_awesome,
+                color: Colors.white,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Upgrade to Premium',
+                    style: textBold.copyWith(color: Colors.white),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Unlock unlimited readings & insights',
+                    style: textSmall.copyWith(
+                      color: Colors.white.withValues(alpha: 0.8),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(Dimensions.radiusCircular),
+              ),
+              child: Text(
+                'Go Pro',
+                style: textBoldSmall.copyWith(color: ColorResources.primary),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
-  Widget _buildMenuTile(
-    BuildContext context,
-    _MenuItem item, {
-    required bool showDivider,
-  }) {
+  // ---------------------------------------------------------------------------
+  // Menu List — simple, clean rows with icon + title + chevron
+  // ---------------------------------------------------------------------------
+
+  Widget _buildMenuList(BuildContext context) {
+    final items = [
+      _MenuItem(
+        icon: Icons.person_outline_rounded,
+        title: 'Edit Profile',
+        onTap: () => context.push(RouteUri.editProfile),
+      ),
+      _MenuItem(
+        icon: Icons.history_rounded,
+        title: 'Chat History',
+        onTap: () => context.push(RouteUri.chatHistory),
+      ),
+      _MenuItem(
+        icon: Icons.workspace_premium_outlined,
+        title: 'Subscription',
+        onTap: () {
+          // TODO: Navigate to subscription screen
+        },
+      ),
+      _MenuItem(
+        icon: Icons.settings_outlined,
+        title: 'Settings',
+        onTap: () => context.push(RouteUri.settings),
+      ),
+      _MenuItem(
+        icon: Icons.help_outline_rounded,
+        title: 'Help & Support',
+        onTap: () => _showAboutSheet(context),
+      ),
+    ];
+
+    return Column(
+      children: List.generate(items.length, (index) {
+        final item = items[index];
+        final isLast = index == items.length - 1;
+        return _buildMenuRow(item, showDivider: !isLast);
+      }),
+    );
+  }
+
+  Widget _buildMenuRow(_MenuItem item, {required bool showDivider}) {
     return Column(
       children: [
         Material(
           color: Colors.transparent,
           child: InkWell(
             onTap: item.onTap,
-            borderRadius: showDivider
-                ? null
-                : const BorderRadius.vertical(bottom: Radius.circular(16)),
+            borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 4),
               child: Row(
                 children: [
-                  // Icon badge
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: item.iconColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(
-                        Dimensions.radiusDefault,
-                      ),
-                    ),
-                    child: Icon(item.icon, color: item.iconColor, size: 20),
-                  ),
-                  const SizedBox(width: 14),
-                  // Text
+                  Icon(item.icon, color: ColorResources.ink, size: 22),
+                  const SizedBox(width: 16),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item.title,
-                          style: textMedium.copyWith(color: ColorResources.ink),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          item.subtitle,
-                          style: textSmall.copyWith(
-                            color: ColorResources.muted,
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      item.title,
+                      style: textMedium.copyWith(color: ColorResources.ink),
                     ),
                   ),
-                  // Chevron
                   Icon(
                     Icons.chevron_right_rounded,
                     color: ColorResources.muted.withValues(alpha: 0.5),
-                    size: 20,
+                    size: 22,
                   ),
                 ],
               ),
@@ -286,12 +425,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
         if (showDivider)
-          Padding(
-            padding: const EdgeInsets.only(left: 70),
-            child: Divider(
-              height: 1,
-              color: ColorResources.border.withValues(alpha: 0.6),
-            ),
+          Divider(
+            height: 1,
+            color: ColorResources.border.withValues(alpha: 0.5),
+            indent: 42,
           ),
       ],
     );
@@ -352,15 +489,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 class _MenuItem {
   const _MenuItem({
     required this.icon,
-    required this.iconColor,
     required this.title,
-    required this.subtitle,
     required this.onTap,
   });
 
   final IconData icon;
-  final Color iconColor;
   final String title;
-  final String subtitle;
   final VoidCallback onTap;
 }

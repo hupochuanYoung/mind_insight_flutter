@@ -45,10 +45,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           color: ColorResources.ink,
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text(
-          'Edit Profile',
-          style: textBoldLarge.copyWith(color: ColorResources.ink),
-        ),
+        title: Text('Edit Profile', style: textBoldLarge.copyWith(color: ColorResources.ink)),
         centerTitle: true,
       ),
       body: Consumer<ProfileProvider>(
@@ -113,11 +110,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     colors: [avatarColor.withValues(alpha: 0.8), avatarColor],
                   ),
                   boxShadow: [
-                    BoxShadow(
-                      color: avatarColor.withValues(alpha: 0.25),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
-                    ),
+                    BoxShadow(color: avatarColor.withValues(alpha: 0.25), blurRadius: 16, offset: const Offset(0, 6)),
                   ],
                 ),
                 child: profile?.avatar != null && profile!.avatar!.isNotEmpty
@@ -141,20 +134,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white, width: 2.5),
                   ),
-                  child: const Icon(
-                    Icons.camera_alt_rounded,
-                    color: Colors.white,
-                    size: 15,
-                  ),
+                  child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 15),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 10),
-          Text(
-            'Tap to change photo',
-            style: textSmall.copyWith(color: ColorResources.muted),
-          ),
+          Text('Tap to change photo', style: textSmall.copyWith(color: ColorResources.muted)),
         ],
       ),
     );
@@ -165,11 +151,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return Center(
       child: Text(
         initial,
-        style: const TextStyle(
-          fontSize: 38,
-          fontWeight: FontWeight.w700,
-          color: Colors.white,
-        ),
+        style: const TextStyle(fontSize: 38, fontWeight: FontWeight.w700, color: Colors.white),
       ),
     );
   }
@@ -179,20 +161,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   // ---------------------------------------------------------------------------
 
   Widget _buildSectionLabel(String label) {
-    return Text(
-      label,
-      style: textBoldSmall.copyWith(
-        color: ColorResources.muted,
-        letterSpacing: 0.5,
-      ),
-    );
+    return Text(label, style: textBoldSmall.copyWith(color: ColorResources.muted, letterSpacing: 0.5));
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String hint,
-    required IconData icon,
-  }) {
+  Widget _buildTextField({required TextEditingController controller, required String hint, required IconData icon}) {
     return Container(
       decoration: BoxDecoration(
         color: ColorResources.card,
@@ -204,15 +176,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         style: textMedium.copyWith(color: ColorResources.ink),
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: textRegular.copyWith(
-            color: ColorResources.muted.withValues(alpha: 0.6),
-          ),
+          hintStyle: textRegular.copyWith(color: ColorResources.muted.withValues(alpha: 0.6)),
           prefixIcon: Icon(icon, color: ColorResources.muted, size: 20),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 14,
-          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
       ),
     );
@@ -221,36 +188,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget _buildGenderSelector() {
     return Row(
       children: [
-        _buildGenderChip(
-          label: 'Male',
-          icon: Icons.male_rounded,
-          value: 1,
-          color: const Color(0xFF5B8DEF),
-        ),
+        _buildGenderChip(label: 'Female', icon: Icons.female_rounded, value: 2, color: ColorResources.pink),
         const SizedBox(width: 12),
-        _buildGenderChip(
-          label: 'Female',
-          icon: Icons.female_rounded,
-          value: 2,
-          color: ColorResources.pink,
-        ),
+        _buildGenderChip(label: 'Male', icon: Icons.male_rounded, value: 1, color: const Color(0xFF5B8DEF)),
         const SizedBox(width: 12),
-        _buildGenderChip(
-          label: 'Other',
-          icon: Icons.diversity_1_rounded,
-          value: 0,
-          color: ColorResources.primary,
-        ),
+        _buildGenderChip(label: 'Other', icon: Icons.diversity_1_rounded, value: 0, color: ColorResources.primary),
       ],
     );
   }
 
-  Widget _buildGenderChip({
-    required String label,
-    required IconData icon,
-    required int value,
-    required Color color,
-  }) {
+  Widget _buildGenderChip({required String label, required IconData icon, required int value, required Color color}) {
     final isSelected = _selectedGender == value;
     return Expanded(
       child: GestureDetector(
@@ -259,22 +206,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
-            color: isSelected
-                ? color.withValues(alpha: 0.1)
-                : ColorResources.card,
+            color: isSelected ? color.withValues(alpha: 0.1) : ColorResources.card,
             borderRadius: BorderRadius.circular(Dimensions.radiusMedium),
-            border: Border.all(
-              color: isSelected ? color : ColorResources.border,
-              width: isSelected ? 1.5 : 1,
-            ),
+            border: Border.all(color: isSelected ? color : ColorResources.border, width: isSelected ? 1.5 : 1),
           ),
           child: Column(
             children: [
-              Icon(
-                icon,
-                color: isSelected ? color : ColorResources.muted,
-                size: 24,
-              ),
+              Icon(icon, color: isSelected ? color : ColorResources.muted, size: 24),
               const SizedBox(height: 6),
               Text(
                 label,
@@ -302,26 +240,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         style: FilledButton.styleFrom(
           backgroundColor: ColorResources.primary,
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(Dimensions.radiusMedium),
-          ),
-          disabledBackgroundColor: ColorResources.primary.withValues(
-            alpha: 0.5,
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Dimensions.radiusMedium)),
+          disabledBackgroundColor: ColorResources.primary.withValues(alpha: 0.5),
         ),
         child: provider.isUpdating
             ? const SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
               )
-            : Text(
-                'Save Changes',
-                style: textBold.copyWith(color: Colors.white, fontSize: 15),
-              ),
+            : Text('Save Changes', style: textBold.copyWith(color: Colors.white, fontSize: 15)),
       ),
     );
   }
@@ -333,10 +261,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       return;
     }
 
-    final param = ProfileUpdateParam(
-      nickname: nickname,
-      gender: _selectedGender,
-    );
+    final param = ProfileUpdateParam(nickname: nickname, gender: _selectedGender);
 
     final success = await context.read<ProfileProvider>().updateProfile(param);
     if (!mounted) return;
