@@ -30,10 +30,8 @@ class DrawInvitationWidget extends StatelessWidget {
             ?.map((e) => e.toString())
             .toList() ??
         [];
-    final actions = (data['actions'] as List<dynamic>?)
-            ?.map((e) => e.toString())
-            .toList() ??
-        [];
+    final actions = GenUiRegistry.actionList(data);
+    final startDrawAction = _findAction(actions, 'start_draw');
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
@@ -113,13 +111,13 @@ class DrawInvitationWidget extends StatelessWidget {
             ),
           ],
           // Action button
-          if (actions.contains('start_draw')) ...[
+          if (startDrawAction != null) ...[
             const SizedBox(height: 18),
             SizedBox(
               width: double.infinity,
               height: 44,
               child: ElevatedButton(
-                onPressed: () => onAction('start_draw', data),
+                onPressed: () => onAction(startDrawAction, data),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: ColorResources.primary,
                   foregroundColor: Colors.white,
@@ -144,5 +142,15 @@ class DrawInvitationWidget extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Map<String, dynamic>? _findAction(
+    List<Map<String, dynamic>> actions,
+    String type,
+  ) {
+    for (final action in actions) {
+      if (action['type'] == type) return action;
+    }
+    return null;
   }
 }

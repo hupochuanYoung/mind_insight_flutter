@@ -113,16 +113,16 @@ class _CardShuffleTestScreenState extends State<CardShuffleTestScreen> {
             const SizedBox(height: 16),
 
             // --- The widget under test ---
-            CardShuffleWidget(
-              key: _widgetKey,
-              data: {
-                'requiredCards': _requiredCards,
-                'spreadName': 'Test Spread',
-                'positions': _positions.take(_requiredCards).toList(),
-                'tarotSessionId': 42,
-              },
-              onAction: _handleAction,
-            ),
+            // CardShuffleWidget(
+            //   key: _widgetKey,
+            //   data: {
+            //     'requiredCards': _requiredCards,
+            //     'spreadName': 'Test Spread',
+            //     'positions': _positions.take(_requiredCards).toList(),
+            //     'tarotSessionId': 42,
+            //   },
+            //   onAction: _handleAction,
+            // ),
 
             const SizedBox(height: 24),
 

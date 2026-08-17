@@ -29,11 +29,7 @@ class InterpretationWidget extends StatelessWidget {
             ?.map((e) => e as Map<String, dynamic>)
             .toList() ??
         [];
-    final actions =
-        (data['actions'] as List<dynamic>?)
-            ?.map((e) => e.toString())
-            .toList() ??
-        [];
+    final actions = GenUiRegistry.actionList(data);
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
@@ -60,30 +56,30 @@ class InterpretationWidget extends StatelessWidget {
           // Interpretation sections
           if (interpretation.isNotEmpty) ...[
             if (interpretation['summary'] != null)
-              _buildSection('解读总结', interpretation['summary'] as String),
+              _buildSection('解读总结', _asText(interpretation['summary'])),
             if (interpretation['card_meaning'] != null)
-              _buildSection('牌义', interpretation['card_meaning'] as String),
+              _buildSection('牌义', _asText(interpretation['card_meaning'])),
             if (interpretation['orientation_meaning'] != null)
               _buildSection(
                 '正逆位含义',
-                interpretation['orientation_meaning'] as String,
+                _asText(interpretation['orientation_meaning']),
               ),
             if (interpretation['position_meaning'] != null)
               _buildSection(
                 '牌位含义',
-                interpretation['position_meaning'] as String,
+                _asText(interpretation['position_meaning']),
               ),
             if (interpretation['guidance'] != null)
-              _buildSection('指引', interpretation['guidance'] as String),
+              _buildSection('指引', _asText(interpretation['guidance'])),
             if (interpretation['action_suggestion'] != null)
               _buildSection(
                 '行动建议',
-                interpretation['action_suggestion'] as String,
+                _asText(interpretation['action_suggestion']),
               ),
             if (interpretation['today_energy'] != null)
               _buildEnergySection(interpretation),
             if (interpretation['affirmation'] != null)
-              _buildAffirmation(interpretation['affirmation'] as String),
+              _buildAffirmation(_asText(interpretation['affirmation'])),
           ],
           // Actions
           if (actions.isNotEmpty) ...[
@@ -199,8 +195,12 @@ class InterpretationWidget extends StatelessWidget {
   }
 
   Widget _buildEnergySection(Map<String, dynamic> interpretation) {
-    final energy = interpretation['today_energy'] as String?;
-    final avoid = interpretation['avoid'] as String?;
+    final energy = interpretation['today_energy'] != null
+        ? _asText(interpretation['today_energy'])
+        : null;
+    final avoid = interpretation['avoid'] != null
+        ? _asText(interpretation['avoid'])
+        : null;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -302,12 +302,13 @@ class InterpretationWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildActions(List<String> actions) {
+  Widget _buildActions(List<Map<String, dynamic>> actions) {
     return Wrap(
       spacing: 10,
       children: actions.map((action) {
-        final label = _actionLabel(action);
-        final isPrimary = action == 'continue_chat';
+        final actionType = action['type'] as String? ?? '';
+        final label = (action['label'] as String?) ?? _actionLabel(actionType);
+        final isPrimary = actionType == 'continue_chat';
         return ElevatedButton(
           onPressed: () => onAction(action, data),
           style: ElevatedButton.styleFrom(
@@ -337,5 +338,18 @@ class InterpretationWidget extends StatelessWidget {
       'end_draw' => '结束本次',
       _ => action,
     };
+  }
+
+  /// Converts a value to displayable text.
+  /// Handles String, Map (joins values), and List (joins items).
+  String _asText(dynamic value) {
+    if (value is String) return value;
+    if (value is Map) {
+      return value.entries.map((e) => '${e.key}：${e.value}').join('\n\n');
+    }
+    if (value is List) {
+      return value.map((e) => e.toString()).join('\n');
+    }
+    return value.toString();
   }
 }

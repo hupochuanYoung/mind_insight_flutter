@@ -19,7 +19,7 @@ class CardRevealWidget extends StatelessWidget {
   /// Expected keys:
   /// - `cards`: list of maps with `position`, `name`, `orientation`
   /// - `message`: String — summary message from agent
-  /// - `actions`: list of strings
+  /// - `actions`: list of action objects
   final Map<String, dynamic> data;
   final GenUiActionCallback onAction;
 
@@ -32,11 +32,7 @@ class CardRevealWidget extends StatelessWidget {
             .toList() ??
         [];
     final message = data['message'] as String? ?? '';
-    final actions =
-        (data['actions'] as List<dynamic>?)
-            ?.map((e) => e.toString())
-            .toList() ??
-        [];
+    final actions = GenUiRegistry.actionList(data);
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
@@ -185,12 +181,14 @@ class CardRevealWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildActions(List<String> actions) {
+  Widget _buildActions(List<Map<String, dynamic>> actions) {
     return Wrap(
       spacing: 10,
       children: actions.map((action) {
-        final label = _actionLabel(action);
-        final isPrimary = action == 'reveal_cards' || action == 'continue_chat';
+        final actionType = action['type'] as String? ?? '';
+        final label = (action['label'] as String?) ?? _actionLabel(actionType);
+        final isPrimary =
+            actionType == 'reveal_cards' || actionType == 'continue_chat';
         return ElevatedButton(
           onPressed: () => onAction(action, data),
           style: ElevatedButton.styleFrom(

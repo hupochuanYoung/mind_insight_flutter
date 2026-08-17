@@ -299,7 +299,7 @@ class _ChatPageState extends State<ChatPage> {
 
     if (parsedData['type'] == 'tarot_ui') {
       if (interactive) _lastAgentData = parsedData;
-      final uiView = parsedData['ui_view'] as String? ?? '';
+      final uiView = GenUiRegistry.surfaceKey(parsedData);
 
       if (uiView == 'plain_message' || uiView == 'clarify_question') {
         final msg = parsedData['message'] as String? ?? '';
@@ -411,7 +411,7 @@ class _ChatPageState extends State<ChatPage> {
 
           if (parsedData != null && parsedData['type'] == 'tarot_ui') {
             _lastAgentData = parsedData;
-            final uiView = parsedData['ui_view'] as String? ?? '';
+            final uiView = GenUiRegistry.surfaceKey(parsedData);
 
             // Plain text responses → insert as normal text message (shows time)
             if (uiView == 'plain_message' || uiView == 'clarify_question') {
@@ -439,45 +439,67 @@ class _ChatPageState extends State<ChatPage> {
   // GenUI action handler — orchestrates the tarot flow
   // ===========================================================================
 
-  void _handleGenUiAction(String action, Map<String, dynamic> data) {
-    switch (action) {
+  void _handleGenUiAction(
+    Map<String, dynamic> action,
+    Map<String, dynamic> data,
+  ) {
+    final actionType = action['type'] as String? ?? '';
+    switch (actionType) {
       case 'start_draw':
-        _handleStartDraw(data);
+        _handleStartDraw(action, data);
+        break;
       case 'reveal_cards':
-        _handleRevealCards(data);
+        _handleRevealCards(action, data);
+        break;
       case 'continue_chat':
         // No-op — just let user keep typing
         break;
       case 'end_draw':
         _handleEndDraw();
+        break;
       default:
         break;
     }
   }
 
   /// Create a tarot draw session, then show the card shuffle widget.
-  Future<void> _handleStartDraw(Map<String, dynamic> data) async {
+  Future<void> _handleStartDraw(
+    Map<String, dynamic> action,
+    Map<String, dynamic> data,
+  ) async {
     setState(() => _isLoading = true);
 
     final innerData = data['data'] as Map<String, dynamic>? ?? {};
     final spread =
         innerData['recommended_spread'] as Map<String, dynamic>? ?? {};
+    final payload = action['payload'] as Map<String, dynamic>? ?? {};
+    final requiredCards =
+        spread['required_cards'] as int? ??
+        payload['required_cards'] as int? ??
+        1;
+    final positions =
+        (spread['positions'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        ['此刻最需要看见的部分'];
 
     // Build draw param from the agent response data
     final param = CreateTarotDrawParam(
-      conversationId: _chatProvider.currentConversationId ?? 0,
+      conversationId:
+          (payload['conversation_id'] as int?) ??
+          _chatProvider.currentConversationId ??
+          0,
       question: innerData['question_summary'] as String? ?? '',
       questionSummary: innerData['question_summary'] as String?,
       topic: innerData['topic'] as String?,
-      spreadType: spread['id'] as String? ?? 'single_card',
+      spreadType:
+          (payload['spread_id'] as String?) ??
+          (spread['id'] as String?) ??
+          'single_card',
       spreadName: spread['name'] as String?,
-      requiredCards: spread['required_cards'] as int? ?? 1,
+      requiredCards: requiredCards,
       guidance: data['message'] as String?,
-      positions:
-          (spread['positions'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          ['此刻最需要看见的部分'],
+      positions: positions,
       allowReversed: true,
       // Agent metadata from the chat response
       agentRecordId: _chatProvider.lastAgentResponse?.recordId,
@@ -485,7 +507,7 @@ class _ChatPageState extends State<ChatPage> {
       agentRelatedRecordId: _chatProvider.lastAgentResponse?.relatedRecordId,
       agentMessageId: _chatProvider.lastAgentResponse?.messageId,
       agentStage: data['stage'] as String?,
-      agentUiView: data['ui_view'] as String?,
+      agentUiView: GenUiRegistry.surfaceKey(data),
       agentLanguage: data['language'] as String?,
       agentActions: data['actions'] as List<dynamic>?,
       agentText: data,
@@ -500,8 +522,8 @@ class _ChatPageState extends State<ChatPage> {
     } else if (_chatProvider.currentTarotSession != null) {
       final session = _chatProvider.currentTarotSession!;
       // Insert the card shuffle widget
-      _insertGenUiMessage({
-        'ui_view': 'card_shuffle',
+        _insertGenUiMessage({
+        'stage': 'card_shuffle',
         'message': '请选择你的牌',
         'requiredCards': session.requiredCards,
         'spreadName': session.spreadName ?? param.spreadName,
@@ -515,10 +537,15 @@ class _ChatPageState extends State<ChatPage> {
 
   /// Reveal the selected cards.
   /// Reveal the selected cards — backend returns cards + interpretation directly.
-  Future<void> _handleRevealCards(Map<String, dynamic> data) async {
+  Future<void> _handleRevealCards(
+    Map<String, dynamic> action,
+    Map<String, dynamic> data,
+  ) async {
     setState(() => _isLoading = true);
 
+    final payload = action['payload'] as Map<String, dynamic>? ?? {};
     final sessionId =
+        (payload['tarot_session_id'] as int?) ??
         data['tarotSessionId'] as int? ??
         _chatProvider.currentTarotSession?.id ??
         0;
@@ -548,9 +575,10 @@ class _ChatPageState extends State<ChatPage> {
       } else {
         // Fallback: show cards without full interpretation
         _insertGenUiMessage({
-          'ui_view': 'card_reveal',
+          'stage': 'draw_result_ready',
           'message': '牌已翻开',
           'data': {
+            'status': 'draw_ready',
             'cards': reveal.cards
                 .map(
                   (c) => {
@@ -561,7 +589,20 @@ class _ChatPageState extends State<ChatPage> {
                 )
                 .toList(),
           },
-          'actions': ['continue_chat', 'end_draw'],
+          'actions': [
+            {
+              'id': 'continue_chat',
+              'type': 'continue_chat',
+              'label': '继续聊聊',
+              'payload': {},
+            },
+            {
+              'id': 'end_draw',
+              'type': 'end_draw',
+              'label': '先到这里',
+              'payload': {},
+            },
+          ],
         });
       }
     }
@@ -639,7 +680,7 @@ class _ChatPageState extends State<ChatPage> {
     MessageGroupStatus? groupStatus,
   }) {
     final metadata = message.metadata ?? {};
-    final uiView = metadata['ui_view'] as String? ?? '';
+    final uiView = GenUiRegistry.surfaceKey(metadata);
 
     // Typing indicator
     if (uiView == '_typing') {
@@ -674,7 +715,7 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   /// No-op action callback for read-only historical messages.
-  void _noOpAction(String action, Map<String, dynamic> data) {
+  void _noOpAction(Map<String, dynamic> action, Map<String, dynamic> data) {
     // Historical messages — actions are disabled.
   }
 

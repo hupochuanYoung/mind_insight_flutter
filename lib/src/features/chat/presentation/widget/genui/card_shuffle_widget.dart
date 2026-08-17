@@ -183,7 +183,12 @@ class _CardShuffleWidgetState extends State<CardShuffleWidget>
   void _onConfirm() {
     if (_selectedIndexes.length != _requiredCards) return;
     setState(() => _isConfirmed = true);
-    widget.onAction('reveal_cards', {
+    widget.onAction({
+      'id': 'reveal_cards',
+      'type': 'reveal_cards',
+      'label': '翻开牌面',
+      'payload': {},
+    }, {
       ...widget.data,
       'selectedIndexes': _selectedIndexes,
     });
