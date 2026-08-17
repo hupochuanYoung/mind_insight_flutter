@@ -36,11 +36,31 @@ class GenUiRegistry {
     final rawActions = data['actions'];
     if (rawActions is List) {
       return rawActions
-          .whereType<Map<String, dynamic>>()
+          .whereType<Map>()
           .map((action) => Map<String, dynamic>.from(action))
           .toList();
     }
     return const [];
+  }
+
+  static Map<String, dynamic> jsonMap(dynamic value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return Map<String, dynamic>.from(value);
+    }
+    return const <String, dynamic>{};
+  }
+
+  static List<Map<String, dynamic>> jsonMapList(dynamic value) {
+    if (value is List) {
+      return value
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    }
+    return const <Map<String, dynamic>>[];
   }
 
   /// Build the appropriate widget for the given agent response data.

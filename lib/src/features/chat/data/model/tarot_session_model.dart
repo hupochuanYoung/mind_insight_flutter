@@ -50,6 +50,12 @@ class TarotSessionModel {
   });
 
   factory TarotSessionModel.fromJson(Map<String, dynamic> json) {
+    final cardsJson =
+        (json['cards'] as List<dynamic>?)
+            ?.whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList() ??
+        const <Map<String, dynamic>>[];
     return TarotSessionModel(
       id: json['id'] as int? ?? 0,
       conversationId: json['conversationId'] as int? ?? 0,
@@ -69,11 +75,7 @@ class TarotSessionModel {
       allowReversed: json['allowReversed'] as bool? ?? true,
       status: json['status'] as String? ?? 'created',
       requiredCards: json['requiredCards'] as int? ?? 1,
-      cards: (json['cards'] as List<dynamic>?)
-              ?.map((e) =>
-                  TarotCardResultModel.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          [],
+      cards: cardsJson.map(TarotCardResultModel.fromJson).toList(),
       interpretation: json['interpretation'] as String?,
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'] as String)

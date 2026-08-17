@@ -469,10 +469,9 @@ class _ChatPageState extends State<ChatPage> {
   ) async {
     setState(() => _isLoading = true);
 
-    final innerData = data['data'] as Map<String, dynamic>? ?? {};
-    final spread =
-        innerData['recommended_spread'] as Map<String, dynamic>? ?? {};
-    final payload = action['payload'] as Map<String, dynamic>? ?? {};
+    final innerData = GenUiRegistry.jsonMap(data['data']);
+    final spread = GenUiRegistry.jsonMap(innerData['recommended_spread']);
+    final payload = GenUiRegistry.jsonMap(action['payload']);
     final requiredCards =
         spread['required_cards'] as int? ??
         payload['required_cards'] as int? ??
@@ -543,7 +542,7 @@ class _ChatPageState extends State<ChatPage> {
   ) async {
     setState(() => _isLoading = true);
 
-    final payload = action['payload'] as Map<String, dynamic>? ?? {};
+    final payload = GenUiRegistry.jsonMap(action['payload']);
     final sessionId =
         (payload['tarot_session_id'] as int?) ??
         data['tarotSessionId'] as int? ??

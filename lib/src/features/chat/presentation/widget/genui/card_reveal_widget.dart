@@ -25,12 +25,8 @@ class CardRevealWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final innerData = data['data'] as Map<String, dynamic>? ?? {};
-    final cards =
-        (innerData['cards'] as List<dynamic>?)
-            ?.map((e) => e as Map<String, dynamic>)
-            .toList() ??
-        [];
+    final innerData = GenUiRegistry.jsonMap(data['data']);
+    final cards = GenUiRegistry.jsonMapList(innerData['cards']);
     final message = data['message'] as String? ?? '';
     final actions = GenUiRegistry.actionList(data);
 

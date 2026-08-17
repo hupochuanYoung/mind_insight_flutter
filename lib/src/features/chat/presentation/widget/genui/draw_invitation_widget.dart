@@ -21,9 +21,8 @@ class DrawInvitationWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final message = data['message'] as String? ?? '';
-    final innerData = data['data'] as Map<String, dynamic>? ?? {};
-    final spread =
-        innerData['recommended_spread'] as Map<String, dynamic>? ?? {};
+    final innerData = GenUiRegistry.jsonMap(data['data']);
+    final spread = GenUiRegistry.jsonMap(innerData['recommended_spread']);
     final spreadName = spread['name'] as String? ?? '塔罗牌';
     final requiredCards = spread['required_cards'] as int? ?? 1;
     final positions = (spread['positions'] as List<dynamic>?)

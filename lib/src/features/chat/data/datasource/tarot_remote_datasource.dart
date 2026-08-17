@@ -17,6 +17,16 @@ class TarotRemoteDatasource {
   TarotRemoteDatasource({required DioClient dioClient})
     : _dioClient = dioClient;
 
+  Map<String, dynamic> _asJsonMap(dynamic value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return Map<String, dynamic>.from(value);
+    }
+    return <String, dynamic>{};
+  }
+
   /// POST /api/tarot/draws
   Future<Either<Failure, TarotSessionModel>> createDraw(
     CreateTarotDrawParam param,
@@ -26,7 +36,7 @@ class TarotRemoteDatasource {
         AppConstants.tarotDrawsUri,
         data: param.toJson(),
       );
-      final body = response.data as Map<String, dynamic>;
+      final body = _asJsonMap(response.data);
       final code = body['code'] as int? ?? -1;
       if (code != 0) {
         return left(
@@ -37,7 +47,7 @@ class TarotRemoteDatasource {
         );
       }
       return right(
-        TarotSessionModel.fromJson(body['data'] as Map<String, dynamic>),
+        TarotSessionModel.fromJson(_asJsonMap(body['data'])),
       );
     } on DioException catch (e) {
       return left(
@@ -54,7 +64,7 @@ class TarotRemoteDatasource {
   Future<Either<Failure, TarotSessionModel>> getDraw(int id) async {
     try {
       final response = await _dioClient.get(AppConstants.tarotDrawUri(id));
-      final body = response.data as Map<String, dynamic>;
+      final body = _asJsonMap(response.data);
       final code = body['code'] as int? ?? -1;
       if (code != 0) {
         return left(
@@ -65,7 +75,7 @@ class TarotRemoteDatasource {
         );
       }
       return right(
-        TarotSessionModel.fromJson(body['data'] as Map<String, dynamic>),
+        TarotSessionModel.fromJson(_asJsonMap(body['data'])),
       );
     } on DioException catch (e) {
       return left(
@@ -88,7 +98,7 @@ class TarotRemoteDatasource {
         AppConstants.tarotDrawRevealUri(id),
         data: param.toJson(),
       );
-      final body = response.data as Map<String, dynamic>;
+      final body = _asJsonMap(response.data);
       final code = body['code'] as int? ?? -1;
       if (code != 0) {
         return left(
@@ -99,7 +109,7 @@ class TarotRemoteDatasource {
         );
       }
       return right(
-        TarotRevealModel.fromJson(body['data'] as Map<String, dynamic>),
+        TarotRevealModel.fromJson(_asJsonMap(body['data'])),
       );
     } on DioException catch (e) {
       return left(
@@ -118,7 +128,7 @@ class TarotRemoteDatasource {
       final response = await _dioClient.post(
         AppConstants.tarotDrawInterpretUri(id),
       );
-      final body = response.data as Map<String, dynamic>;
+      final body = _asJsonMap(response.data);
       final code = body['code'] as int? ?? -1;
       if (code != 0) {
         return left(
@@ -129,7 +139,7 @@ class TarotRemoteDatasource {
         );
       }
       return right(
-        TarotRevealModel.fromJson(body['data'] as Map<String, dynamic>),
+        TarotRevealModel.fromJson(_asJsonMap(body['data'])),
       );
     } on DioException catch (e) {
       return left(
